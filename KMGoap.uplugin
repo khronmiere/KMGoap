@@ -18,6 +18,11 @@
 			"Name": "KMGoap",
 			"Type": "Runtime",
 			"LoadingPhase": "Default"
+		},
+		{
+			"Name": "KMGoapEditor",
+			"Type": "Editor",
+			"LoadingPhase": "PostDefault"
 		}
 	]
 }
