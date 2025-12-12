@@ -23,6 +23,11 @@
 			"Name": "KMGoapEditor",
 			"Type": "Editor",
 			"LoadingPhase": "PostDefault"
+		},
+		{
+			"Name": "KMGoapGraph",
+			"Type": "Editor",
+			"LoadingPhase": "PostDefault"
 		}
 	]
 }

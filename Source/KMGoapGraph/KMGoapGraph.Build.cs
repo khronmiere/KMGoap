@@ -1,8 +1,8 @@
 ﻿using UnrealBuildTool;
 
-public class KMGoapEditor : ModuleRules
+public class KMGoapGraph : ModuleRules
 {
-    public KMGoapEditor(ReadOnlyTargetRules Target) : base(Target)
+    public KMGoapGraph(ReadOnlyTargetRules Target) : base(Target)
     {
         PCHUsage = ModuleRules.PCHUsageMode.UseExplicitOrSharedPCHs;
 
@@ -21,6 +21,7 @@ public class KMGoapEditor : ModuleRules
                 "Slate",
                 "SlateCore",
                 "KMGoap",
+                "KMGoapEditor",
             }
         );
     }
