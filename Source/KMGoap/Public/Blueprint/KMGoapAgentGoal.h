@@ -5,15 +5,15 @@
 #include "CoreMinimal.h"
 #include "GameplayTagContainer.h"
 #include "UObject/Object.h"
-#include "AgentGoal.generated.h"
+#include "KMGoapAgentGoal.generated.h"
 
-class UAgentComponent;
+class UKMGoapAgentComponent;
 
 /**
  * 
  */
 UCLASS(Abstract, BlueprintType, Blueprintable, EditInlineNew, DefaultToInstanced, Category="KMGoap")
-class KMGOAP_API UAgentGoal : public UObject
+class KMGOAP_API UKMGoapAgentGoal : public UObject
 {
 	GENERATED_BODY()
 	
@@ -28,11 +28,11 @@ public:
 	FGameplayTagContainer DesiredEffects;
 	
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category="Goal")
-	float GetPriority(UAgentComponent* Agent) const { return Native_GetPriority(Agent); }
+	float GetPriority(UKMGoapAgentComponent* Agent) const { return Native_GetPriority(Agent); }
 
 protected:
-	virtual float Native_GetPriority(UAgentComponent* Agent) const;
+	virtual float Native_GetPriority(UKMGoapAgentComponent* Agent) const;
 	UFUNCTION(BlueprintNativeEvent, Category="Goal", meta=(BlueprintProtected="true"))
-	float Priority(UAgentComponent* Agent) const;
-	virtual float Priority_Implementation(UAgentComponent* Agent) const;
+	float Priority(UKMGoapAgentComponent* Agent) const;
+	virtual float Priority_Implementation(UKMGoapAgentComponent* Agent) const;
 };

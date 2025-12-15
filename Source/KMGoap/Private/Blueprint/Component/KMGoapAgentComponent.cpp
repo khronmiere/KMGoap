@@ -1,22 +1,22 @@
 ﻿// Fill out your copyright notice in the Description page of Project Settings.
 
 
-#include "Blueprint/Component/AgentComponent.h"
+#include "Blueprint/Component/KMGoapAgentComponent.h"
 
 #include "GameplayTagContainer.h"
-#include "Blueprint/AgentAction.h"
-#include "Blueprint/AgentBelief.h"
-#include "Blueprint/AgentGoal.h"
-#include "Data/ActionSet.h"
-#include "Data/BeliefSet.h"
-#include "Data/GoalSet.h"
-#include "Interface/SensorInterface.h"
-#include "Subsystem/GoapPlannerSubsystem.h"
+#include "Blueprint/KMGoapAgentAction.h"
+#include "Blueprint/KMGoapAgentBelief.h"
+#include "Blueprint/KMGoapAgentGoal.h"
+#include "Data/KMGoapActionSet.h"
+#include "Data/KMGoapBeliefSet.h"
+#include "Data/KMGoapGoalSet.h"
+#include "Interface/KMGoapSensorInterface.h"
+#include "Subsystem/KMGoapPlannerSubsystem.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogGoapAgent, Log, All);
 
 // Sets default values for this component's properties
-UAgentComponent::UAgentComponent()
+UKMGoapAgentComponent::UKMGoapAgentComponent()
 {
 	// Set this component to be initialized when the game starts, and to be ticked every frame.  You can turn these features
 	// off to improve performance if you don't need them.
@@ -25,7 +25,7 @@ UAgentComponent::UAgentComponent()
 	// ...
 }
 
-UAgentBelief* UAgentComponent::GetBeliefByTag(FGameplayTag Tag) const
+UKMGoapAgentBelief* UKMGoapAgentComponent::GetBeliefByTag(FGameplayTag Tag) const
 {
 	if (BeliefsByTag.Contains(Tag))
 	{
@@ -34,7 +34,7 @@ UAgentBelief* UAgentComponent::GetBeliefByTag(FGameplayTag Tag) const
 	return nullptr;
 }
 
-UActorComponent* UAgentComponent::GetSensorByTag(FGameplayTag Tag) const
+UActorComponent* UKMGoapAgentComponent::GetSensorByTag(FGameplayTag Tag) const
 {
 	if (SensorsByTag.Contains(Tag))
 	{
@@ -43,7 +43,7 @@ UActorComponent* UAgentComponent::GetSensorByTag(FGameplayTag Tag) const
 	return nullptr;
 }
 
-UAgentGoal* UAgentComponent::GetGoalByTag(FGameplayTag Tag) const
+UKMGoapAgentGoal* UKMGoapAgentComponent::GetGoalByTag(FGameplayTag Tag) const
 {
 	if (GoalsByTag.Contains(Tag))
 	{
@@ -52,7 +52,7 @@ UAgentGoal* UAgentComponent::GetGoalByTag(FGameplayTag Tag) const
 	return nullptr;
 }
 
-UAgentAction* UAgentComponent::GetActionByTag(FGameplayTag Tag) const
+UKMGoapAgentAction* UKMGoapAgentComponent::GetActionByTag(FGameplayTag Tag) const
 {
 	if (ActionsByTag.Contains(Tag))
 	{
@@ -61,25 +61,25 @@ UAgentAction* UAgentComponent::GetActionByTag(FGameplayTag Tag) const
 	return nullptr;
 }
 
-bool UAgentComponent::EvaluateBeliefByTag(FGameplayTag Tag) const
+bool UKMGoapAgentComponent::EvaluateBeliefByTag(FGameplayTag Tag) const
 {
-	if (UAgentBelief* Belief = GetBeliefByTag(Tag))
+	if (UKMGoapAgentBelief* Belief = GetBeliefByTag(Tag))
 	{
 		return Belief->Evaluate();
 	}
 	return false;
 }
 
-FVector UAgentComponent::GetBeliefLocationByTag(FGameplayTag Tag) const
+FVector UKMGoapAgentComponent::GetBeliefLocationByTag(FGameplayTag Tag) const
 {
-	if (UAgentBelief* Belief = GetBeliefByTag(Tag))
+	if (UKMGoapAgentBelief* Belief = GetBeliefByTag(Tag))
 	{
 		return Belief->GetLocation();
 	}
 	return FVector::ZeroVector;
 }
 
-void UAgentComponent::ApplyEffectByTag(FGameplayTag Tag, bool bValue)
+void UKMGoapAgentComponent::ApplyEffectByTag(FGameplayTag Tag, bool bValue)
 {
 	if (!Tag.IsValid()) return;
 	if (bValue)
@@ -90,12 +90,12 @@ void UAgentComponent::ApplyEffectByTag(FGameplayTag Tag, bool bValue)
 	Facts.RemoveTag(Tag);
 }
 
-bool UAgentComponent::GetFact(FGameplayTag Tag) const
+bool UKMGoapAgentComponent::GetFact(FGameplayTag Tag) const
 {
 	return Facts.HasTagExact(Tag);
 }
 
-void UAgentComponent::BeginPlay()
+void UKMGoapAgentComponent::BeginPlay()
 {
 	Super::BeginPlay();
 
@@ -107,7 +107,7 @@ void UAgentComponent::BeginPlay()
 	ResetExecutionState();
 }
 
-void UAgentComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
+void UKMGoapAgentComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	ClearSensors();
 	ResetExecutionState();
@@ -115,7 +115,7 @@ void UAgentComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 }
 
 
-void UAgentComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
+void UKMGoapAgentComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 	
@@ -144,9 +144,9 @@ void UAgentComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActor
 	
 	if (CurrentAction)
 	{
-		const EActionStatus Status = CurrentAction->TickAction(this, DeltaTime);
+		const EKMGoapActionStatus Status = CurrentAction->TickAction(this, DeltaTime);
 
-		if (Status == EActionStatus::Succeeded || Status == EActionStatus::Failed)
+		if (Status == EKMGoapActionStatus::Succeeded || Status == EKMGoapActionStatus::Failed)
 		{
 			CurrentAction->StopAction(this);
 			CurrentAction = nullptr;
@@ -161,21 +161,21 @@ void UAgentComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActor
 	}
 }
 
-void UAgentComponent::HandleSensorTargetChanged(FGameplayTag SourceTag)
+void UKMGoapAgentComponent::HandleSensorTargetChanged(FGameplayTag SourceTag)
 {
 	UE_LOG(LogGoapAgent, Display, TEXT("Target changed, clearing current action and goal."));
 	ResetExecutionState();
 	OnSensorTargetChanged(SourceTag);
 }
 
-void UAgentComponent::ResetExecutionState()
+void UKMGoapAgentComponent::ResetExecutionState()
 {
 	CurrentAction = nullptr;
 	CurrentGoal = nullptr;
 	CurrentPlan.Reset();
 }
 
-void UAgentComponent::CalculatePlan()
+void UKMGoapAgentComponent::CalculatePlan()
 {
 	float CurrentPriority = 0.f;
 	if (CurrentGoal)
@@ -183,12 +183,12 @@ void UAgentComponent::CalculatePlan()
 		CurrentPriority = CurrentGoal->GetPriority(this);
 	}
 
-	TArray<UAgentGoal*> GoalsToCheck;
+	TArray<UKMGoapAgentGoal*> GoalsToCheck;
 	GoalsToCheck.Reserve(GoalsByTag.Num());
 
 	for (auto& Pair : GoalsByTag)
 	{
-		UAgentGoal* Goal = Pair.Value;
+		UKMGoapAgentGoal* Goal = Pair.Value;
 		if (!Goal) continue;
 
 		const float GoalPriority = Goal->GetPriority(this);
@@ -199,14 +199,14 @@ void UAgentComponent::CalculatePlan()
 		}
 	}
 
-	FActionPlan NewPlan;
+	FKMGoapActionPlan NewPlan;
 	if (ComputePlanForGoals(GoalsToCheck, NewPlan) && NewPlan.IsValid())
 	{
 		CurrentPlan = MoveTemp(NewPlan);
 	}
 }
 
-bool UAgentComponent::ValidateActionPreconditions(const UAgentAction* Action) const
+bool UKMGoapAgentComponent::ValidateActionPreconditions(const UKMGoapAgentAction* Action) const
 {
 	if (!Action)
 	{
@@ -233,13 +233,13 @@ bool UAgentComponent::ValidateActionPreconditions(const UAgentAction* Action) co
 	return true;
 }
 
-bool UAgentComponent::ComputePlanForGoals(const TArray<UAgentGoal*>& GoalsToCheck, FActionPlan& OutPlan)
+bool UKMGoapAgentComponent::ComputePlanForGoals(const TArray<UKMGoapAgentGoal*>& GoalsToCheck, FKMGoapActionPlan& OutPlan)
 {
 	if (UWorld* World = GetWorld())
 	{
 		if (UGameInstance* GI = World->GetGameInstance())
 		{
-			if (UGoapPlannerSubsystem* Planner = GI->GetSubsystem<UGoapPlannerSubsystem>())
+			if (UKMGoapPlannerSubsystem* Planner = GI->GetSubsystem<UKMGoapPlannerSubsystem>())
 			{
 				return Planner->Plan(this, GoalsToCheck, LastGoal, OutPlan);
 			}
@@ -248,46 +248,46 @@ bool UAgentComponent::ComputePlanForGoals(const TArray<UAgentGoal*>& GoalsToChec
 	return false;
 }
 
-void UAgentComponent::BuildBeliefs()
+void UKMGoapAgentComponent::BuildBeliefs()
 {
 	UE_LOG(LogGoapAgent, Display, TEXT("Building Beliefs Cache"));
 	BeliefsByTag.Reset();
 	if (!BeliefSet) return;
-	BuildTaggedObjects<UAgentBelief>(
+	BuildTaggedObjects<UKMGoapAgentBelief>(
 		this,
 		BeliefSet->Beliefs,
 		BeliefsByTag,
-		[](const UAgentBelief* Belief) { return Belief->BeliefTag; }
+		[](const UKMGoapAgentBelief* Belief) { return Belief->BeliefTag; }
 	);
 }
 
-void UAgentComponent::BuildActions()
+void UKMGoapAgentComponent::BuildActions()
 {
 	UE_LOG(LogGoapAgent, Display, TEXT("Building Actions Cache"));
 	ActionsByTag.Reset();
 	if (!ActionSet) return;
-	BuildTaggedObjects<UAgentAction>(
+	BuildTaggedObjects<UKMGoapAgentAction>(
 		this,
 		ActionSet->Actions,
 		ActionsByTag,
-		[](const UAgentAction* Action) { return Action->ActionTag; }
+		[](const UKMGoapAgentAction* Action) { return Action->ActionTag; }
 	);
 }
 
-void UAgentComponent::BuildGoals()
+void UKMGoapAgentComponent::BuildGoals()
 {
 	UE_LOG(LogGoapAgent, Display, TEXT("Building Goals Cache"));
 	GoalsByTag.Reset();
 	if (!GoalSet) return;
-	BuildTaggedObjects<UAgentGoal>(
+	BuildTaggedObjects<UKMGoapAgentGoal>(
 		this,
 		GoalSet->Goals,
 		GoalsByTag,
-		[](const UAgentGoal* Action) { return Action->GoalTag; }
+		[](const UKMGoapAgentGoal* Action) { return Action->GoalTag; }
 	);
 }
 
-void UAgentComponent::CacheSensors()
+void UKMGoapAgentComponent::CacheSensors()
 {
 	UE_LOG(LogGoapAgent, Display, TEXT("Building Sensors Cache"));
 	AActor* Owner = GetOwner();
@@ -295,12 +295,12 @@ void UAgentComponent::CacheSensors()
 	SensorsByTag.Reset();
 	
 	TArray<UActorComponent*> SensorComponents =	GetOwner()->GetComponentsByInterface(
-		USensorInterface::StaticClass()
+		UKMGoapSensorInterface::StaticClass()
 	);
 	
 	for (UActorComponent* Sensor : SensorComponents)
 	{
-		FGameplayTag Tag = ISensorInterface::Execute_GetTag(Sensor);
+		FGameplayTag Tag = IKMGoapSensorInterface::Execute_GetTag(Sensor);
 		if (!Tag.IsValid())
 		{
 			UE_LOG(LogGoapAgent, Warning, TEXT("Found sensor component with invalid tag: %s"),
@@ -320,7 +320,7 @@ void UAgentComponent::CacheSensors()
 	}
 }
 
-void UAgentComponent::ClearSensors()
+void UKMGoapAgentComponent::ClearSensors()
 {
 	for (auto& Pair : SensorsByTag)
 	{
@@ -330,19 +330,19 @@ void UAgentComponent::ClearSensors()
 	SensorsByTag.Reset();
 }
 
-void UAgentComponent::BindSensorEvents(UActorComponent* Sensor)
+void UKMGoapAgentComponent::BindSensorEvents(UActorComponent* Sensor)
 {
-	ISensorInterface::Execute_RegisterTargetChangedListener(
+	IKMGoapSensorInterface::Execute_RegisterTargetChangedListener(
 			Sensor,
 			this,
-			GET_FUNCTION_NAME_CHECKED(UAgentComponent, HandleSensorTargetChanged));
+			GET_FUNCTION_NAME_CHECKED(UKMGoapAgentComponent, HandleSensorTargetChanged));
 }
 
-void UAgentComponent::UnbindSensorEvents(UActorComponent* Sensor)
+void UKMGoapAgentComponent::UnbindSensorEvents(UActorComponent* Sensor)
 {
-	ISensorInterface::Execute_UnregisterTargetChangedListener(
+	IKMGoapSensorInterface::Execute_UnregisterTargetChangedListener(
 			Sensor,
 			this,
-			GET_FUNCTION_NAME_CHECKED(UAgentComponent, HandleSensorTargetChanged));
+			GET_FUNCTION_NAME_CHECKED(UKMGoapAgentComponent, HandleSensorTargetChanged));
 }
 

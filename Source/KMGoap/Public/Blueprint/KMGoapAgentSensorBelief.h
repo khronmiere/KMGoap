@@ -3,14 +3,14 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "AgentBelief.h"
-#include "AgentSensorBelief.generated.h"
+#include "KMGoapAgentBelief.h"
+#include "KMGoapAgentSensorBelief.generated.h"
 
 /**
  * 
  */
 UCLASS(Abstract, Category="KMGoap", Blueprintable)
-class KMGOAP_API UAgentSensorBelief : public UAgentBelief
+class KMGOAP_API UKMGoapAgentSensorBelief : public UKMGoapAgentBelief
 {
 	GENERATED_BODY()
 

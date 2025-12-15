@@ -5,80 +5,80 @@
 #include "CoreMinimal.h"
 #include "GameplayTagContainer.h"
 #include "Components/ActorComponent.h"
-#include "AgentComponent.generated.h"
+#include "KMGoapAgentComponent.generated.h"
 
-class UAgentAction;
-class UBeliefSet;
-class UAgentGoal;
-class UAgentBelief;
-class UGoalSet;
-class UActionSet;
-class USensorComponent;
+class UKMGoapAgentAction;
+class UKMGoapBeliefSet;
+class UKMGoapAgentGoal;
+class UKMGoapAgentBelief;
+class UKMGoapGoalSet;
+class UKMGoapActionSet;
+class UKMGoapSensorComponent;
 
 USTRUCT(BlueprintType)
-struct FActionPlan
+struct FKMGoapActionPlan
 {
 	GENERATED_BODY()
 
 	UPROPERTY(BlueprintReadOnly)
-	TObjectPtr<UAgentGoal> Goal = nullptr;
+	TObjectPtr<UKMGoapAgentGoal> Goal = nullptr;
 
 	UPROPERTY(BlueprintReadOnly)
-	TArray<TObjectPtr<UAgentAction>> Actions; // front = first
-
+	TArray<TObjectPtr<UKMGoapAgentAction>> Actions; // front = first
+	
 	bool IsValid() const { return Goal != nullptr && Actions.Num() > 0; }
 	void Reset() { Goal = nullptr; Actions.Reset(); }
 };
 
 UCLASS(ClassGroup=(KMGoap), meta=(BlueprintSpawnableComponent))
-class KMGOAP_API UAgentComponent : public UActorComponent
+class KMGOAP_API UKMGoapAgentComponent : public UActorComponent
 {
 	GENERATED_BODY()
 
 public:
-	UAgentComponent();
+	UKMGoapAgentComponent();
 	
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="GOAP")
-	TObjectPtr<UBeliefSet> BeliefSet;
+	TObjectPtr<UKMGoapBeliefSet> BeliefSet;
 	UPROPERTY(Transient, BlueprintReadOnly, Category="GOAP")
-	TMap<FGameplayTag, TObjectPtr<UAgentBelief>> BeliefsByTag;
+	TMap<FGameplayTag, TObjectPtr<UKMGoapAgentBelief>> BeliefsByTag;
 	
 	UPROPERTY(Transient, BlueprintReadOnly, Category="GOAP")
 	TMap<FGameplayTag, TObjectPtr<UActorComponent>> SensorsByTag;
 	
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="GOAP|Sets")
-	TObjectPtr<UActionSet> ActionSet;
+	TObjectPtr<UKMGoapActionSet> ActionSet;
 	UPROPERTY(Transient, BlueprintReadOnly, Category="GOAP")
-	TMap<FGameplayTag, TObjectPtr<UAgentAction>> ActionsByTag;
+	TMap<FGameplayTag, TObjectPtr<UKMGoapAgentAction>> ActionsByTag;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="GOAP|Sets")
-	TObjectPtr<UGoalSet> GoalSet;
+	TObjectPtr<UKMGoapGoalSet> GoalSet;
 	UPROPERTY(Transient, BlueprintReadOnly, Category="GOAP")
-	TMap<FGameplayTag, TObjectPtr<UAgentGoal>> GoalsByTag;
+	TMap<FGameplayTag, TObjectPtr<UKMGoapAgentGoal>> GoalsByTag;
 	
 	UPROPERTY(BlueprintReadOnly, Category="GOAP|Runtime")
-	TObjectPtr<UAgentGoal> CurrentGoal = nullptr;
+	TObjectPtr<UKMGoapAgentGoal> CurrentGoal = nullptr;
 
 	UPROPERTY(BlueprintReadOnly, Category="GOAP|Runtime")
-	TObjectPtr<UAgentGoal> LastGoal = nullptr;
+	TObjectPtr<UKMGoapAgentGoal> LastGoal = nullptr;
 
 	UPROPERTY(BlueprintReadOnly, Category="GOAP|Runtime")
-	FActionPlan CurrentPlan;
+	FKMGoapActionPlan CurrentPlan;
 
 	UPROPERTY(BlueprintReadOnly, Category="GOAP|Runtime")
-	TObjectPtr<UAgentAction> CurrentAction = nullptr;
+	TObjectPtr<UKMGoapAgentAction> CurrentAction = nullptr;
 	
 	UFUNCTION(BlueprintCallable, Category="GOAP|Beliefs")
-	UAgentBelief* GetBeliefByTag(FGameplayTag Tag) const;
+	UKMGoapAgentBelief* GetBeliefByTag(FGameplayTag Tag) const;
 
 	UFUNCTION(BlueprintCallable, Category="GOAP|Sensors")
 	UActorComponent* GetSensorByTag(FGameplayTag Tag) const;
 	
 	UFUNCTION(BlueprintCallable, Category="GOAP|Sensors")
-	UAgentGoal* GetGoalByTag(FGameplayTag Tag) const;
+	UKMGoapAgentGoal* GetGoalByTag(FGameplayTag Tag) const;
 	
 	UFUNCTION(BlueprintCallable, Category="GOAP|Sensors")
-	UAgentAction* GetActionByTag(FGameplayTag Tag) const;
+	UKMGoapAgentAction* GetActionByTag(FGameplayTag Tag) const;
 	
 	UFUNCTION(BlueprintCallable, Category="GOAP|Beliefs")
 	bool EvaluateBeliefByTag(FGameplayTag Tag) const;
@@ -92,7 +92,7 @@ public:
 	UFUNCTION(BlueprintCallable, Category="GOAP|Facts")
 	bool GetFact(FGameplayTag Tag) const;
 	
-	bool ValidateActionPreconditions(const UAgentAction* Action) const;
+	bool ValidateActionPreconditions(const UKMGoapAgentAction* Action) const;
 
 protected:
 	virtual void BeginPlay() override;
@@ -102,7 +102,7 @@ protected:
 	UFUNCTION(BlueprintNativeEvent, Category="GOAP|Runtime")
 	void OnSensorTargetChanged(FGameplayTag SensorTag);
 	virtual void OnSensorTargetChanged_Implementation(FGameplayTag SensorTag){}
-	
+
 private:
 	UPROPERTY(Transient)
 	FGameplayTagContainer Facts;
@@ -119,12 +119,10 @@ private:
 
 	UFUNCTION()
 	void HandleSensorTargetChanged(FGameplayTag SourceTag);
-	void ResetExecutionState();
 	
 	void CalculatePlan();
-
-	// Planner hook (you plug your planner implementation here)
-	bool ComputePlanForGoals(const TArray<UAgentGoal*>& GoalsToCheck, FActionPlan& OutPlan);
+	void ResetExecutionState();
+	bool ComputePlanForGoals(const TArray<UKMGoapAgentGoal*>& GoalsToCheck, FKMGoapActionPlan& OutPlan);
 	
 	template <typename TObjectType, typename TTagGetter>
 	static void BuildTaggedObjects(

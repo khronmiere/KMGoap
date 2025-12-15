@@ -4,15 +4,15 @@
 
 #include "CoreMinimal.h"
 #include "GameplayTagContainer.h"
-#include "Interface/SensorInterface.h"
+#include "Interface/KMGoapSensorInterface.h"
 #include "UObject/Object.h"
-#include "SensorComponent.generated.h"
+#include "KMGoapSensorComponent.generated.h"
 
 /**
  * 
  */
 UCLASS(Category = "KMGoap|ActorComponents", Abstract, BlueprintType, Blueprintable, meta=(BlueprintSpawnableComponent))
-class KMGOAP_API USensorComponent : public UActorComponent, public ISensorInterface
+class KMGOAP_API UKMGoapSensorComponent : public UActorComponent, public IKMGoapSensorInterface
 {
 	GENERATED_BODY()
 	

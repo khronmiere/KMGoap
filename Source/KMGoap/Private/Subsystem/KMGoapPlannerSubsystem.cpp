@@ -1,18 +1,18 @@
-﻿#include "Subsystem/GoapPlannerSubsystem.h"
+﻿#include "Subsystem/KMGoapPlannerSubsystem.h"
 
-#include "Blueprint/Component/AgentComponent.h"
-#include "Blueprint/AgentGoal.h"
-#include "Blueprint/AgentAction.h"
+#include "Blueprint/Component/KMGoapAgentComponent.h"
+#include "Blueprint/KMGoapAgentGoal.h"
+#include "Blueprint/KMGoapAgentAction.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogGoapPlanner, Log, All);
 
 static constexpr float RecentGoalBias = 0.01f;
 
-bool UGoapPlannerSubsystem::Plan(
-	UAgentComponent* Agent,
-	const TArray<UAgentGoal*>& GoalsToCheck,
-	UAgentGoal* MostRecentGoal,
-	FActionPlan& OutPlan)
+bool UKMGoapPlannerSubsystem::Plan(
+	UKMGoapAgentComponent* Agent,
+	const TArray<UKMGoapAgentGoal*>& GoalsToCheck,
+	UKMGoapAgentGoal* MostRecentGoal,
+	FKMGoapActionPlan& OutPlan)
 {
 	OutPlan.Reset();
 
@@ -23,10 +23,10 @@ bool UGoapPlannerSubsystem::Plan(
 	}
 
 	// Collect candidate goals (filter: only goals that are not already satisfied)
-	TArray<UAgentGoal*> CandidateGoals;
+	TArray<UKMGoapAgentGoal*> CandidateGoals;
 	CandidateGoals.Reserve(GoalsToCheck.Num());
 
-	for (UAgentGoal* Goal : GoalsToCheck)
+	for (UKMGoapAgentGoal* Goal : GoalsToCheck)
 	{
 		if (!Goal) continue;
 
@@ -56,12 +56,12 @@ bool UGoapPlannerSubsystem::Plan(
 	SortGoals(Agent, CandidateGoals, MostRecentGoal);
 
 	// Build list of actions available to this agent
-	TArray<UAgentAction*> Actions;
+	TArray<UKMGoapAgentAction*> Actions;
 	Actions.Reserve(Agent->ActionsByTag.Num());
 
 	for (const auto& Pair : Agent->ActionsByTag)
 	{
-		if (UAgentAction* Action = Pair.Value)
+		if (UKMGoapAgentAction* Action = Pair.Value)
 		{
 			// Optional: let actions gate themselves
 			// If you don't have CanPerform yet, delete this block or return true by default in Action.
@@ -82,7 +82,7 @@ bool UGoapPlannerSubsystem::Plan(
 	SortActionsByCost(Actions);
 
 	// Try goals in priority order
-	for (UAgentGoal* Goal : CandidateGoals)
+	for (UKMGoapAgentGoal* Goal : CandidateGoals)
 	{
 		if (!Goal) continue;
 
@@ -114,7 +114,7 @@ bool UGoapPlannerSubsystem::Plan(
 		}
 
 		// Extract plan by walking down cheapest leaves repeatedly (Unity behavior)
-		TArray<TObjectPtr<UAgentAction>> ForwardActions;
+		TArray<TObjectPtr<UKMGoapAgentAction>> ForwardActions;
 		TSharedPtr<FGoapNode> Cursor = Root;
 
 		while (Cursor.IsValid() && Cursor->Leaves.Num() > 0)
@@ -155,10 +155,10 @@ bool UGoapPlannerSubsystem::Plan(
 	return false;
 }
 
-bool UGoapPlannerSubsystem::FindPath(
-	UAgentComponent* Agent,
+bool UKMGoapPlannerSubsystem::FindPath(
+	UKMGoapAgentComponent* Agent,
 	const TSharedPtr<FGoapNode>& Parent,
-	const TArray<UAgentAction*>& AvailableActions)
+	const TArray<UKMGoapAgentAction*>& AvailableActions)
 {
 	if (!Agent || !Parent.IsValid())
 	{
@@ -170,10 +170,10 @@ bool UGoapPlannerSubsystem::FindPath(
 		return true;
 	}
 	
-	TArray<UAgentAction*> OrderedActions = AvailableActions;
+	TArray<UKMGoapAgentAction*> OrderedActions = AvailableActions;
 	SortActionsByCost(OrderedActions);
 
-	for (UAgentAction* Action : OrderedActions)
+	for (UKMGoapAgentAction* Action : OrderedActions)
 	{
 		if (!Action) continue;
 		
@@ -195,7 +195,7 @@ bool UGoapPlannerSubsystem::FindPath(
 		NewRequired.RemoveTags(Action->Effects);
 		NewRequired.AppendTags(Action->Preconditions);
 		
-		TArray<UAgentAction*> NewAvailable = OrderedActions;
+		TArray<UKMGoapAgentAction*> NewAvailable = OrderedActions;
 		NewAvailable.Remove(Action);
 
 		TSharedPtr<FGoapNode> Child = MakeShared<FGoapNode>();
@@ -213,7 +213,7 @@ bool UGoapPlannerSubsystem::FindPath(
 	return Parent->Leaves.Num() > 0;
 }
 
-bool UGoapPlannerSubsystem::IsTagSatisfied(UAgentComponent* Agent, const FGameplayTag& Tag) const
+bool UKMGoapPlannerSubsystem::IsTagSatisfied(UKMGoapAgentComponent* Agent, const FGameplayTag& Tag) const
 {
 	if (!Agent || !Tag.IsValid())
 	{
@@ -228,7 +228,7 @@ bool UGoapPlannerSubsystem::IsTagSatisfied(UAgentComponent* Agent, const FGamepl
 	return Agent->EvaluateBeliefByTag(Tag);
 }
 
-void UGoapPlannerSubsystem::RemoveSatisfied(UAgentComponent* Agent, FGameplayTagContainer& InOutRequired) const
+void UKMGoapPlannerSubsystem::RemoveSatisfied(UKMGoapAgentComponent* Agent, FGameplayTagContainer& InOutRequired) const
 {
 	if (!Agent)
 	{
@@ -247,9 +247,9 @@ void UGoapPlannerSubsystem::RemoveSatisfied(UAgentComponent* Agent, FGameplayTag
 	}
 }
 
-void UGoapPlannerSubsystem::SortGoals(UAgentComponent* Agent, TArray<UAgentGoal*>& InOutGoals, UAgentGoal* MostRecentGoal)
+void UKMGoapPlannerSubsystem::SortGoals(UKMGoapAgentComponent* Agent, TArray<UKMGoapAgentGoal*>& InOutGoals, UKMGoapAgentGoal* MostRecentGoal)
 {
-	InOutGoals.Sort([Agent, MostRecentGoal](const UAgentGoal& A, const UAgentGoal& B)
+	InOutGoals.Sort([Agent, MostRecentGoal](const UKMGoapAgentGoal& A, const UKMGoapAgentGoal& B)
 	{
 		const float PA = A.GetPriority(Agent) - ((MostRecentGoal == &A) ? RecentGoalBias : 0.f);
 		const float PB = B.GetPriority(Agent) - ((MostRecentGoal == &B) ? RecentGoalBias : 0.f);
@@ -258,9 +258,9 @@ void UGoapPlannerSubsystem::SortGoals(UAgentComponent* Agent, TArray<UAgentGoal*
 	});
 }
 
-void UGoapPlannerSubsystem::SortActionsByCost(TArray<UAgentAction*>& InOutActions)
+void UKMGoapPlannerSubsystem::SortActionsByCost(TArray<UKMGoapAgentAction*>& InOutActions)
 {
-	InOutActions.Sort([](const UAgentAction& A, const UAgentAction& B)
+	InOutActions.Sort([](const UKMGoapAgentAction& A, const UKMGoapAgentAction& B)
 	{
 		return A.Cost < B.Cost;
 	});

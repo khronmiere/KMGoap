@@ -5,12 +5,12 @@
 #include "CoreMinimal.h"
 #include "GameplayTagContainer.h"
 #include "UObject/Object.h"
-#include "AgentAction.generated.h"
+#include "KMGoapAgentAction.generated.h"
 
-class UAgentComponent;
+class UKMGoapAgentComponent;
 
 UENUM(BlueprintType)
-enum class EActionStatus : uint8
+enum class EKMGoapActionStatus : uint8
 {
 	NotStarted,
 	Running,
@@ -29,7 +29,7 @@ enum class EActionStatus : uint8
  * - Preconditions/Effects are tags; agent resolves them to beliefs at runtime.
  */
 UCLASS(Abstract, BlueprintType, Blueprintable, EditInlineNew, DefaultToInstanced, Category="KMGoap")
-class KMGOAP_API UAgentAction : public UObject
+class KMGOAP_API UKMGoapAgentAction : public UObject
 {
 	GENERATED_BODY()
 
@@ -47,19 +47,19 @@ public:
 	FGameplayTagContainer Effects;
 	
 	UFUNCTION(BlueprintCallable, Category="Action")
-	void StartAction(UAgentComponent* Agent);
+	void StartAction(UKMGoapAgentComponent* Agent);
 
 	UFUNCTION(BlueprintCallable, Category="Action")
-	EActionStatus TickAction(UAgentComponent* Agent, float DeltaTime);
+	EKMGoapActionStatus TickAction(UKMGoapAgentComponent* Agent, float DeltaTime);
 
 	UFUNCTION(BlueprintCallable, Category="Action")
-	void StopAction(UAgentComponent* Agent);
+	void StopAction(UKMGoapAgentComponent* Agent);
 
 	UFUNCTION(BlueprintCallable, Category="Action")
-	bool IsComplete() const { return Status == EActionStatus::Succeeded || Status == EActionStatus::Failed; }
+	bool IsComplete() const { return Status == EKMGoapActionStatus::Succeeded || Status == EKMGoapActionStatus::Failed; }
 
 	UFUNCTION(BlueprintCallable, Category="Action")
-	EActionStatus GetStatus() const { return Status; }
+	EKMGoapActionStatus GetStatus() const { return Status; }
 	
 	UFUNCTION(BlueprintNativeEvent, Category="Action", meta=(BlueprintProtected="true"))
 	bool CanPerform() const;
@@ -67,19 +67,19 @@ public:
 
 protected:
 	UPROPERTY(Transient)
-	EActionStatus Status = EActionStatus::NotStarted;
+	EKMGoapActionStatus Status = EKMGoapActionStatus::NotStarted;
 	
 	UFUNCTION(BlueprintNativeEvent, Category="Action", meta=(BlueprintProtected="true"))
-	void OnStart(UAgentComponent* Agent);
-	virtual void OnStart_Implementation(UAgentComponent* Agent) {}
+	void OnStart(UKMGoapAgentComponent* Agent);
+	virtual void OnStart_Implementation(UKMGoapAgentComponent* Agent) {}
 
 	UFUNCTION(BlueprintNativeEvent, Category="Action", meta=(BlueprintProtected="true"))
-	EActionStatus OnTick(UAgentComponent* Agent, float DeltaTime);
-	virtual EActionStatus OnTick_Implementation(UAgentComponent* Agent, float DeltaTime);
+	EKMGoapActionStatus OnTick(UKMGoapAgentComponent* Agent, float DeltaTime);
+	virtual EKMGoapActionStatus OnTick_Implementation(UKMGoapAgentComponent* Agent, float DeltaTime);
 
 	UFUNCTION(BlueprintNativeEvent, Category="Action", meta=(BlueprintProtected="true"))
-	void OnStop(UAgentComponent* Agent);
-	virtual void OnStop_Implementation(UAgentComponent* Agent) {}
+	void OnStop(UKMGoapAgentComponent* Agent);
+	virtual void OnStop_Implementation(UKMGoapAgentComponent* Agent) {}
 	
-	void ApplyEffects(UAgentComponent* Agent) const;
+	void ApplyEffects(UKMGoapAgentComponent* Agent) const;
 };

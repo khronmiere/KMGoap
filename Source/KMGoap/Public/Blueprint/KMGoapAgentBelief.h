@@ -5,7 +5,7 @@
 #include "CoreMinimal.h"
 #include "GameplayTagContainer.h"
 #include "UObject/Object.h"
-#include "AgentBelief.generated.h"
+#include "KMGoapAgentBelief.generated.h"
 
 /**
  * UAgentBelief
@@ -20,7 +20,7 @@
  *   meant to be called directly from Blueprints.
  */
 UCLASS(Abstract, Category="KMGoap", Blueprintable)
-class KMGOAP_API UAgentBelief : public UObject
+class KMGOAP_API UKMGoapAgentBelief : public UObject
 {
 	GENERATED_BODY()
 

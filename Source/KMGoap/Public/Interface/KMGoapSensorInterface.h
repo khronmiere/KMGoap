@@ -4,11 +4,11 @@
 
 #include "CoreMinimal.h"
 #include "UObject/Interface.h"
-#include "SensorInterface.generated.h"
+#include "KMGoapSensorInterface.generated.h"
 
 // This class does not need to be modified.
 UINTERFACE(Category = "KMGoap|Interface", BlueprintType)
-class USensorInterface : public UInterface
+class UKMGoapSensorInterface : public UInterface
 {
 	GENERATED_BODY()
 };
@@ -16,7 +16,7 @@ class USensorInterface : public UInterface
 /**
  * 
  */
-class KMGOAP_API ISensorInterface
+class KMGOAP_API IKMGoapSensorInterface
 {
 	GENERATED_BODY()
 

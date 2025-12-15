@@ -4,17 +4,17 @@
 
 #include "CoreMinimal.h"
 #include "Engine/DataAsset.h"
-#include "ActionSet.generated.h"
+#include "KMGoapActionSet.generated.h"
 
 /**
  * 
  */
 UCLASS(Category = "KMGoap|Data", BlueprintType)
-class KMGOAP_API UActionSet : public UDataAsset
+class KMGOAP_API UKMGoapActionSet : public UDataAsset
 {
 	GENERATED_BODY()
 	
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	TArray<TSoftClassPtr<class UAgentAction>> Actions;
+	TArray<TSoftClassPtr<class UKMGoapAgentAction>> Actions;
 };

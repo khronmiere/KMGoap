@@ -4,15 +4,15 @@
 
 #include "CoreMinimal.h"
 #include "Engine/DataAsset.h"
-#include "BeliefSet.generated.h"
+#include "KMGoapBeliefSet.generated.h"
 
 UCLASS(Category = "KMGoap|Data", BlueprintType)
-class KMGOAP_API UBeliefSet : public UDataAsset
+class KMGOAP_API UKMGoapBeliefSet : public UDataAsset
 {
 	GENERATED_BODY()
 
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	TArray<TSoftClassPtr<class UAgentBelief>> Beliefs;
+	TArray<TSoftClassPtr<class UKMGoapAgentBelief>> Beliefs;
 };
 

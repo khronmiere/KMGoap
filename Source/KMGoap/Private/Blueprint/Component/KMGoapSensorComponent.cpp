@@ -1,11 +1,11 @@
 ﻿// Fill out your copyright notice in the Description page of Project Settings.
 
 
-#include "Blueprint/Component/SensorComponent.h"
+#include "Blueprint/Component/KMGoapSensorComponent.h"
 
-#include "Blueprint/Component/AgentComponent.h"
+#include "Blueprint/Component/KMGoapAgentComponent.h"
 
-void USensorComponent::BeginPlay()
+void UKMGoapSensorComponent::BeginPlay()
 {
 	Super::BeginPlay();
 
@@ -19,13 +19,13 @@ void USensorComponent::BeginPlay()
 	TimerManager.SetTimer(
 		DebugDrawTimerHandle, 
 		this, 
-		&USensorComponent::DebugDraw, 
+		&UKMGoapSensorComponent::DebugDraw, 
 		DebugDrawInterval, 
 		true);
 #endif
 }
 
-void USensorComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
+void UKMGoapSensorComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 #if WITH_EDITORONLY_DATA
 	if (!DebugDrawTimerHandle.IsValid())
@@ -44,7 +44,7 @@ void USensorComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	Super::EndPlay(EndPlayReason);
 }
 
-void USensorComponent::SetTarget(AActor* NewTarget)
+void UKMGoapSensorComponent::SetTarget(AActor* NewTarget)
 {
 	const FVector NewPos = NewTarget ? NewTarget->GetActorLocation() : FVector::ZeroVector;
 
@@ -61,12 +61,12 @@ void USensorComponent::SetTarget(AActor* NewTarget)
 	}
 }
 
-FGameplayTag USensorComponent::GetTag_Implementation() const
+FGameplayTag UKMGoapSensorComponent::GetTag_Implementation() const
 {
 	return SensorTag;
 }
 
-void USensorComponent::RegisterTargetChangedListener_Implementation(UObject* Listener, FName FunctionName)
+void UKMGoapSensorComponent::RegisterTargetChangedListener_Implementation(UObject* Listener, FName FunctionName)
 {
 	if (!Listener) return;
 
@@ -75,7 +75,7 @@ void USensorComponent::RegisterTargetChangedListener_Implementation(UObject* Lis
 	OnTargetChanged.AddUnique(Delegate);
 }
 
-void USensorComponent::UnregisterTargetChangedListener_Implementation(UObject* Listener, FName FunctionName)
+void UKMGoapSensorComponent::UnregisterTargetChangedListener_Implementation(UObject* Listener, FName FunctionName)
 {
 	if (!Listener) return;
 
@@ -84,12 +84,12 @@ void USensorComponent::UnregisterTargetChangedListener_Implementation(UObject* L
 	OnTargetChanged.Remove(Delegate);
 }
 
-bool USensorComponent::HasTarget_Implementation() const
+bool UKMGoapSensorComponent::HasTarget_Implementation() const
 {
 	return TargetActor.IsValid();
 }
 
-FVector USensorComponent::GetTargetPosition_Implementation() const
+FVector UKMGoapSensorComponent::GetTargetPosition_Implementation() const
 {
 	return TargetActor.IsValid() ? TargetActor->GetActorLocation() : FVector::ZeroVector;
 }
