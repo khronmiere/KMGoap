@@ -1,13 +1,6 @@
 # KMGoap
 GOAP Plugin to allow better AI Authoring and smarter agents with less effort
 
-    UEdGraphNode_GoapGoal --> UGoapGoalAsset : wraps
-    UEdGraphNode_GoapAction --> UGoapActionAsset : wraps
-
-    UK2Node_GoapSetWorldValue --> UGoapAgentComponent : expandsTo
-    UK2Node_GoapGetWorldValue --> UGoapAgentComponent : expandsTo
-    UK2Node_GoapRequestPlan --> UGoapAgentComponent : expandsTo
-
 ```mermaid
 classDiagram
     direction LR
