@@ -37,7 +37,7 @@ protected:
 	UPROPERTY(Transient)
 	FVector LastKnownPosition = FVector::ZeroVector;
 
-#if WITH_EDITOR
+#if WITH_EDITORONLY_DATA
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Sensor|Debug", meta=(ClampMin="0.01"))
 	float DebugDrawInterval = 0.1f;
 	FTimerHandle DebugDrawTimerHandle;

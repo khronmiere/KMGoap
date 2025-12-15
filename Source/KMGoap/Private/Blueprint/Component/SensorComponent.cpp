@@ -9,7 +9,7 @@ void USensorComponent::BeginPlay()
 {
 	Super::BeginPlay();
 
-#if WITH_EDITOR
+#if WITH_EDITORONLY_DATA
 	UWorld* World = GetWorld();
 	if (!World || !World->IsGameWorld())
 	{
@@ -27,7 +27,7 @@ void USensorComponent::BeginPlay()
 
 void USensorComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
-#if WITH_EDITOR
+#if WITH_EDITORONLY_DATA
 	if (!DebugDrawTimerHandle.IsValid())
 	{
 		return;
