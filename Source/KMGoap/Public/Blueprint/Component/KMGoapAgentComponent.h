@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "GameplayTagContainer.h"
 #include "Components/ActorComponent.h"
+#include "Data/KMGoapCondition.h"
 #include "Subsystem/Data/KMGoapActionPlan.h"
 #include "KMGoapAgentComponent.generated.h"
 
@@ -89,6 +90,7 @@ public:
 	EKMGoapFactState GetFact(FGameplayTag Tag) const;
 	
 	bool ValidateActionPreconditions(const UKMGoapAgentAction* Action) const;
+	void UpdateBeliefEvaluationCache();
 
 protected:
 	virtual void BeginPlay() override;

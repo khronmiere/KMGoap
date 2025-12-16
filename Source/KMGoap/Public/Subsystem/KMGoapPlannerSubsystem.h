@@ -23,6 +23,10 @@ class KMGOAP_API UKMGoapPlannerSubsystem : public UGameInstanceSubsystem, public
 	GENERATED_BODY()
 
 public:
+	
+	virtual void Initialize(FSubsystemCollectionBase& Collection) override;
+	virtual void Deinitialize() override;
+	
 	virtual bool Plan_Implementation(
 		UKMGoapAgentComponent* Agent,
 		const TArray<UKMGoapAgentGoal*>& GoalsToCheck,
@@ -30,28 +34,11 @@ public:
 		FKMGoapActionPlan& OutPlan) override;
 
 private:
-	struct FGoapNode
-	{
-		TSharedPtr<FGoapNode> Parent;
-		TObjectPtr<UKMGoapAgentAction> Action = nullptr;
-		TSet<FKMGoapCondition> Required;      // tags that must become true
-		float Cost = 0.f;
-		TArray<TSharedPtr<FGoapNode>> Leaves;
+	UPROPERTY(Transient)
+	TObjectPtr<UKMGoapPlanSearchBase> SearchAlgorithm = nullptr;
 
-		bool IsLeafDead() const { return Leaves.Num() == 0 && Action == nullptr; }
-	};
+	UPROPERTY(Transient)
+	TObjectPtr<UKMGoapPlannerConfig> LoadedConfig = nullptr;
 
-	// Core recursive search (Unity FindPath port, but without mutating parent state)
-	bool FindPath(
-		UKMGoapAgentComponent* Agent,
-		const TSharedPtr<FGoapNode>& Parent,
-		const TArray<UKMGoapAgentAction*>& AvailableActions);
-
-	// Helpers
-	bool IsConditionSatisfied(UKMGoapAgentComponent* Agent, const FKMGoapCondition& Condition) const;
-	void RemoveSatisfied(UKMGoapAgentComponent* Agent, TSet<FKMGoapCondition>& InOutRequired) const;
-
-	// Ordering
-	static void SortGoals(UKMGoapAgentComponent* Agent, TArray<UKMGoapAgentGoal*>& InOutGoals, UKMGoapAgentGoal* MostRecentGoal);
-	static void SortActionsByCost(const UKMGoapAgentComponent* Agent, TArray<UKMGoapAgentAction*>& InOutActions);
+	void CreateAlgorithmFromConfig();
 };

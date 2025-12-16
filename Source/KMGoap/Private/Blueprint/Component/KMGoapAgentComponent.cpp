@@ -28,46 +28,50 @@ UKMGoapAgentComponent::UKMGoapAgentComponent()
 
 UKMGoapAgentBelief* UKMGoapAgentComponent::GetBeliefByTag(FGameplayTag Tag) const
 {
-	if (BeliefsByTag.Contains(Tag))
+	if (auto Belief = BeliefsByTag.Find(Tag))
 	{
-		return BeliefsByTag[Tag];
+		return *Belief;
 	}
 	return nullptr;
 }
 
 UActorComponent* UKMGoapAgentComponent::GetSensorByTag(FGameplayTag Tag) const
 {
-	if (SensorsByTag.Contains(Tag))
+	if (auto Sensor = SensorsByTag.Find(Tag))
 	{
-		return SensorsByTag[Tag];
+		return *Sensor;
 	}
 	return nullptr;
 }
 
 UKMGoapAgentGoal* UKMGoapAgentComponent::GetGoalByTag(FGameplayTag Tag) const
 {
-	if (GoalsByTag.Contains(Tag))
+	if (auto Goal = GoalsByTag.Find(Tag))
 	{
-		return GoalsByTag[Tag];
+		return *Goal;
 	}
 	return nullptr;
 }
 
 UKMGoapAgentAction* UKMGoapAgentComponent::GetActionByTag(FGameplayTag Tag) const
 {
-	if (ActionsByTag.Contains(Tag))
+	if (auto Action = ActionsByTag.Find(Tag))
 	{
-		return ActionsByTag[Tag];
+		return *Action;
 	}
 	return nullptr;
 }
 
 bool UKMGoapAgentComponent::EvaluateBeliefByTag(FGameplayTag Tag) const
 {
-	if (BeliefCache.Contains(Tag))
+	if (auto CacheEntry = BeliefCache.Find(Tag))
 	{
-		return BeliefCache[Tag].bValue;
+		return CacheEntry->bValue;
 	}
+	
+	UE_LOG(LogGoapAgent, Error,
+		TEXT("Belief not present in Cache. Are we evaluating beliefs not added in the Set?, Requested Belief with tag %s"),
+		*Tag.ToString());
 	return false;
 }
 
@@ -80,21 +84,18 @@ FVector UKMGoapAgentComponent::GetBeliefLocationByTag(FGameplayTag Tag) const
 	return FVector::ZeroVector;
 }
 
-void UKMGoapAgentComponent::SetFact(FGameplayTag FactTag, bool bValue)
+void UKMGoapAgentComponent::SetFact(FGameplayTag FactTag, bool bNewValue)
 {
 	if (!FactTag.IsValid()) return;
-	if (Facts.Contains(FactTag))
-	{
-		Facts[FactTag] = bValue;
-	}
-	Facts.Add(FactTag, bValue);
+	bool& bCurrentFactValue = Facts.FindOrAdd(FactTag);
+	bCurrentFactValue = bNewValue;
 }
 
 EKMGoapFactState UKMGoapAgentComponent::GetFact(FGameplayTag Tag) const
 {
-	if (Facts.Contains(Tag))
+	if (const bool* bValue = Facts.Find(Tag))
 	{
-		return Facts[Tag] ? EKMGoapFactState::Active : EKMGoapFactState::Inactive;
+		return *bValue ? EKMGoapFactState::Active : EKMGoapFactState::Inactive;
 	}
 	return EKMGoapFactState::Unknown;
 }
@@ -186,11 +187,9 @@ void UKMGoapAgentComponent::EvaluateBeliefs()
 			continue;
 		}
 		bool bResult = Belief->Evaluate();
-		if (BeliefCache.Contains(Tag))
-		{
-			BeliefCache[Tag].bValue = bResult;
-		}
-		BeliefCache.Add(Tag, FKMGoapBeliefCacheEntry{Tag, bResult});
+		FKMGoapBeliefCacheEntry& Entry = BeliefCache.FindOrAdd(Tag);
+		Entry.BeliefTag = Tag;
+		Entry.bValue = bResult;
 	}
 }
 
@@ -280,6 +279,11 @@ bool UKMGoapAgentComponent::ValidateActionPreconditions(const UKMGoapAgentAction
 	}
 
 	return true;
+}
+
+void UKMGoapAgentComponent::UpdateBeliefEvaluationCache()
+{
+	EvaluateBeliefs();
 }
 
 bool UKMGoapAgentComponent::ComputePlanForGoals(const TArray<UKMGoapAgentGoal*>& GoalsToCheck, FKMGoapActionPlan& OutPlan)
