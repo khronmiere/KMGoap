@@ -1,5 +1,4 @@
 ﻿#include "Subsystem/KMGoapPlannerSubsystem.h"
-#include "Blueprint/KMGoapAgentGoal.h"
 #include "Settings/KMGoapSettings.h"
 #include "Settings/Data/KMGoapPlannerConfig.h"
 #include "Subsystem/Behavior/KMGoapPlanSearchBase.h"
@@ -18,25 +17,6 @@ void UKMGoapPlannerSubsystem::Deinitialize()
 	SearchAlgorithm = nullptr;
 	LoadedConfig = nullptr;
 	Super::Deinitialize();
-}
-
-bool UKMGoapPlannerSubsystem::Plan_Implementation(
-	UKMGoapAgentComponent* Agent,
-	const TArray<UKMGoapAgentGoal*>& GoalsToCheck,
-	UKMGoapAgentGoal* MostRecentGoal,
-	FKMGoapActionPlan& OutPlan)
-{
-	if (!SearchAlgorithm)
-	{
-		return false;
-	}
-	
-	return IKMGoapPlanSearchInterface::Execute_BuildPlan(
-		SearchAlgorithm,
-		Agent,
-		GoalsToCheck,
-		MostRecentGoal,
-		OutPlan);
 }
 
 void UKMGoapPlannerSubsystem::CreateAlgorithmFromConfig()

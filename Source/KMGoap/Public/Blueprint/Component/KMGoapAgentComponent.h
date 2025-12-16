@@ -5,8 +5,8 @@
 #include "CoreMinimal.h"
 #include "GameplayTagContainer.h"
 #include "Components/ActorComponent.h"
+#include "Data/KMGoapActionPlan.h"
 #include "Data/KMGoapCondition.h"
-#include "Subsystem/Data/KMGoapActionPlan.h"
 #include "KMGoapAgentComponent.generated.h"
 
 struct FKMGoapCondition;
@@ -89,6 +89,8 @@ public:
 	UFUNCTION(BlueprintCallable, Category="GOAP|Facts")
 	EKMGoapFactState GetFact(FGameplayTag Tag) const;
 	
+	void FilterFactSatisfiedPreconditions(TSet<FKMGoapCondition>& Preconditions) const;
+	void FilterBeliefSatisfiedPreconditions(TSet<FKMGoapCondition>& Preconditions) const;
 	bool ValidateActionPreconditions(const UKMGoapAgentAction* Action) const;
 	void UpdateBeliefEvaluationCache();
 

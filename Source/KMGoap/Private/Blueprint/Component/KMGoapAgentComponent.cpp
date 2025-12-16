@@ -10,9 +10,13 @@
 #include "Blueprint/Data/KMGoapActionSet.h"
 #include "Blueprint/Data/KMGoapBeliefSet.h"
 #include "Blueprint/Data/KMGoapGoalSet.h"
+#include "Data/KMGoapActionPlan.h"
 #include "Data/KMGoapCondition.h"
+#include "Interface/KMGoapPlanSearchInterface.h"
 #include "Interface/KMGoapSensorInterface.h"
+#include "Kismet/GameplayStatics.h"
 #include "Subsystem/KMGoapPlannerSubsystem.h"
+#include "Subsystem/Behavior/KMGoapPlanSearchBase.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogGoapAgent, Log, All);
 
@@ -231,6 +235,51 @@ void UKMGoapAgentComponent::CalculatePlan()
 	}
 }
 
+void UKMGoapAgentComponent::FilterFactSatisfiedPreconditions(TSet<FKMGoapCondition>& Preconditions) const
+{
+	TArray<FKMGoapCondition> ToRemove;
+	for (const FKMGoapCondition& Precondition : Preconditions)
+	{
+		const bool* Fact = Facts.Find(Precondition.Tag);
+		if (!Fact)
+		{
+			continue;
+		}
+		
+		if (Precondition.bValue == *Fact)
+		{
+			ToRemove.Add(Precondition);
+		}
+	}
+	
+	for (const FKMGoapCondition& Condition : ToRemove)
+	{
+		Preconditions.Remove(Condition);
+	}
+}
+
+void UKMGoapAgentComponent::FilterBeliefSatisfiedPreconditions(TSet<FKMGoapCondition>& Preconditions) const
+{
+	TArray<FKMGoapCondition> ToRemove;
+	for (const FKMGoapCondition& Precondition : Preconditions)
+	{
+		if (Facts.Contains(Precondition.Tag))
+		{
+			continue;
+		}
+		
+		if (EvaluateBeliefByTag(Precondition.Tag) == Precondition.bValue)
+		{
+			ToRemove.Add(Precondition);
+		}
+	}
+	
+	for (const FKMGoapCondition& Condition : ToRemove)
+	{
+		Preconditions.Remove(Condition);
+	}
+}
+
 bool UKMGoapAgentComponent::ValidateActionPreconditions(const UKMGoapAgentAction* Action) const
 {
 	if (!Action)
@@ -238,47 +287,10 @@ bool UKMGoapAgentComponent::ValidateActionPreconditions(const UKMGoapAgentAction
 		return false;
 	}
 
-	const TSet<FKMGoapCondition>& Preconditions = Action->Preconditions;
-	// We need to evaluate if the 
-	bool bContainAllInRequiredState = true;
-	for (const FKMGoapCondition& Precondition : Preconditions)
-	{
-		if (!Facts.Contains(Precondition.Tag))
-		{
-			bContainAllInRequiredState = false;
-			break;
-		}
-		
-		if (Precondition.bValue != Facts[Precondition.Tag])
-		{
-			bContainAllInRequiredState = false;
-			break;
-		}
-	}
-	
-	if (bContainAllInRequiredState)
-	{
-		return true;
-	}
-	
-	TSet<FKMGoapCondition> Missing = Preconditions;
-	for (const TTuple<FGameplayTag, bool>& Fact : Facts)
-	{
-		if (FKMGoapCondition* Item = Missing.Find(FKMGoapCondition{Fact.Key, !Fact.Value}))
-		{
-			Missing.Remove(*Item);
-		}
-	}
-	
-	for (const FKMGoapCondition& Condition : Missing)
-	{
-		if (EvaluateBeliefByTag(Condition.Tag) != Condition.bValue)
-		{
-			return false;
-		}
-	}
-
-	return true;
+	TSet<FKMGoapCondition> Preconditions = Action->Preconditions;
+	FilterFactSatisfiedPreconditions(Preconditions);
+	FilterBeliefSatisfiedPreconditions(Preconditions);
+	return Preconditions.IsEmpty();
 }
 
 void UKMGoapAgentComponent::UpdateBeliefEvaluationCache()
@@ -288,17 +300,26 @@ void UKMGoapAgentComponent::UpdateBeliefEvaluationCache()
 
 bool UKMGoapAgentComponent::ComputePlanForGoals(const TArray<UKMGoapAgentGoal*>& GoalsToCheck, FKMGoapActionPlan& OutPlan)
 {
-	if (UWorld* World = GetWorld())
+	UGameInstance* GameInstance = UGameplayStatics::GetGameInstance(GetWorld());
+	if (!GameInstance)
 	{
-		if (UGameInstance* GI = World->GetGameInstance())
-		{
-			if (UKMGoapPlannerSubsystem* Planner = GI->GetSubsystem<UKMGoapPlannerSubsystem>())
-			{
-				return IKMGoapPlannerInterface::Execute_Plan(Planner, this, GoalsToCheck, LastGoal, OutPlan);
-			}
-		}
+		UE_LOG(LogGoapAgent, Error, TEXT("ComputePlanForGoals: GameInstance is NULL"));
+		return false;
 	}
-	return false;
+	UKMGoapPlannerSubsystem* Planner = GameInstance->GetSubsystem<UKMGoapPlannerSubsystem>();
+	if (!Planner)
+	{
+		UE_LOG(LogGoapAgent, Error, TEXT("ComputePlanForGoals: Planner is NULL"));
+		return false;
+	}
+	UKMGoapPlanSearchBase* Algorithm = Planner->GetSearchAlgorithm();
+	if (!Algorithm)
+	{
+		UE_LOG(LogGoapAgent, Error, TEXT("ComputePlanForGoals: Algorithm is NULL"));
+		return false;
+	}
+	
+	return IKMGoapPlanSearchInterface::Execute_BuildPlan(Algorithm, this, GoalsToCheck, LastGoal, OutPlan);
 }
 
 void UKMGoapAgentComponent::BuildBeliefs()

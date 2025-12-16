@@ -29,7 +29,7 @@ struct KMGOAP_API FKMGoapCondition
 
 FORCEINLINE uint32 GetTypeHash(const FKMGoapCondition& Condition)
 {
-	return GetTypeHash(Condition.Tag);
+	return HashCombine(GetTypeHash(Condition.Tag), GetTypeHash(Condition.bValue));
 }
 
 UENUM(BlueprintType)

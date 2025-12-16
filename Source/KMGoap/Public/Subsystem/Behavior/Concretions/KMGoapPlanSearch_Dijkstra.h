@@ -6,7 +6,9 @@
 #include "Subsystem/Behavior/KMGoapPlanSearchBase.h"
 #include "KMGoapPlanSearch_Dijkstra.generated.h"
 
+struct FKMGoapPlanningContext;
 struct FKMGoapCondition;
+struct FKMGoapSimState;
 
 /**
  * 
@@ -24,9 +26,19 @@ public:
 		FKMGoapActionPlan& OutPlan) override;
 
 private:
-	// Helpers that mirror your current subsystem ones.
-	bool IsConditionSatisfied(UKMGoapAgentComponent* Agent, const FKMGoapCondition& Condition) const;
-	void RemoveSatisfied(UKMGoapAgentComponent* Agent, TSet<FKMGoapCondition>& InOutRequired) const;
-
-	static uint32 HashRequired(const TSet<FKMGoapCondition>& Required);
+	bool BuildContext(
+		UKMGoapAgentComponent* Agent,
+		const TArray<UKMGoapAgentGoal*>& GoalsToCheck,
+		UKMGoapAgentGoal* MostRecentGoal,
+		TArray<UKMGoapAgentGoal*>& OutGoalsSorted,
+		FKMGoapPlanningContext& OutCtx) const;
+	
+	bool SolveGoalDijkstra(
+		const FKMGoapPlanningContext& Ctx,
+		UKMGoapAgentGoal* Goal,
+		FKMGoapActionPlan& OutPlan) const;
+	
+	static bool SatisfiesAll(const FKMGoapSimState& State, const TSet<FKMGoapCondition>& Conditions);
+	static uint32 HashState(const FKMGoapSimState& State);
+	void ApplyPostconditions(FKMGoapSimState& State, const TSet<FKMGoapCondition>& Post);
 };
