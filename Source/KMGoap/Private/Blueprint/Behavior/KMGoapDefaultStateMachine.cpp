@@ -48,8 +48,7 @@ void UKMGoapDefaultStateMachine::Tick_Implementation(float DeltaTime)
 		{
 			CurrentAction->StopAction(Agent);
 			CurrentAction = nullptr;
-
-			if (CurrentPlan.Actions.Num() == 0)
+			if (!CurrentPlan.IsValid())
 			{
 				LastGoal = CurrentGoal;
 				ResetExecutionState();
@@ -78,7 +77,7 @@ void UKMGoapDefaultStateMachine::CalculatePlan()
 	for (auto& Pair : GoalsByTag)
 	{
 		UKMGoapAgentGoal* Goal = Pair.Value;
-		if (!Goal) continue;
+		if (!Goal || Goal == CurrentGoal) continue;
 
 		const float GoalPriority = Goal->GetPriority(Agent);
 
@@ -98,7 +97,6 @@ void UKMGoapDefaultStateMachine::CalculatePlan()
 void UKMGoapDefaultStateMachine::UpdateExecutionState()
 {
 	CurrentGoal = CurrentPlan.Goal;
-			
 	CurrentAction = CurrentPlan.Actions[0];
 	CurrentPlan.Actions.RemoveAt(0);
 }
