@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "GameplayTagContainer.h"
+#include "Blueprint/Behavior/KMGoapDefaultStateMachine.h"
 #include "Components/ActorComponent.h"
 #include "Data/KMGoapActionPlan.h"
 #include "Data/KMGoapCondition.h"
@@ -53,18 +54,6 @@ public:
 	UPROPERTY(Transient, BlueprintReadOnly, Category="GOAP")
 	TMap<FGameplayTag, TObjectPtr<UKMGoapAgentGoal>> GoalsByTag;
 	
-	UPROPERTY(BlueprintReadOnly, Category="GOAP|Runtime")
-	TObjectPtr<UKMGoapAgentGoal> CurrentGoal = nullptr;
-
-	UPROPERTY(BlueprintReadOnly, Category="GOAP|Runtime")
-	TObjectPtr<UKMGoapAgentGoal> LastGoal = nullptr;
-
-	UPROPERTY(BlueprintReadOnly, Category="GOAP|Runtime")
-	FKMGoapActionPlan CurrentPlan;
-
-	UPROPERTY(BlueprintReadOnly, Category="GOAP|Runtime")
-	TObjectPtr<UKMGoapAgentAction> CurrentAction = nullptr;
-	
 	UFUNCTION(BlueprintCallable, Category="GOAP|Beliefs")
 	UKMGoapAgentBelief* GetBeliefByTag(FGameplayTag Tag) const;
 
@@ -90,10 +79,15 @@ public:
 	EKMGoapFactState GetFact(FGameplayTag Tag) const;
 	
 	TArray<FGameplayTag> GetFactsTags() const;
-	
+
 	bool ValidateActionPreconditions(const UKMGoapAgentAction* Action) const;
 	void UpdateBeliefEvaluationCache();
-
+	
+	bool ComputePlanForGoals(
+		const TArray<UKMGoapAgentGoal*>& GoalsToCheck,
+		UKMGoapAgentGoal* LastGoal,
+		FKMGoapActionPlan& OutPlan);
+	
 protected:
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
@@ -114,13 +108,21 @@ private:
 	UPROPERTY(EditAnywhere, Category="GOAP|Runtime")
 	float EvaluateBeliefTimeStep = 0.03f;
 	
+	UPROPERTY(EditAnywhere, Category="GOAP|Runtime", meta=(MustImplement="/Script/KMGoap.KMGoapAgentStateMachineInterface"))
+	TSubclassOf<UObject> StateMachineRunnerClass = UKMGoapDefaultStateMachine::StaticClass();
+	UPROPERTY(Transient)
+	TObjectPtr<UObject> StateMachineRunner = nullptr;
+	
 	void BuildBeliefs();
 	void ClearBeliefs();
 	void BuildActions();
 	void BuildGoals();
 	void CacheSensors();
 	void ClearSensors();
-
+	
+	void InitializeStateMachineRunner();
+	void StopStateMachineRunner();
+	
 	void BindSensorEvents(UActorComponent* Sensor);
 	void UnbindSensorEvents(UActorComponent* Sensor);
 	
@@ -131,11 +133,6 @@ private:
 	void HandleSensorTargetChanged(FGameplayTag SourceTag);
 	UFUNCTION()
 	void EvaluateBeliefs();
-	
-	void CalculatePlan();
-	void UpdateExecutionState();
-	void ResetExecutionState();
-	bool ComputePlanForGoals(const TArray<UKMGoapAgentGoal*>& GoalsToCheck, FKMGoapActionPlan& OutPlan);
 	
 	template <typename TObjectType, typename TTagGetter>
 	static void BuildTaggedObjects(

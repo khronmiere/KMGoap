@@ -12,6 +12,7 @@
 #include "Blueprint/Data/KMGoapGoalSet.h"
 #include "Data/KMGoapActionPlan.h"
 #include "Data/KMGoapCondition.h"
+#include "Interface/KMGoapAgentStateMachineInterface.h"
 #include "Interface/KMGoapPlanSearchInterface.h"
 #include "Interface/KMGoapSensorInterface.h"
 #include "Kismet/GameplayStatics.h"
@@ -111,6 +112,19 @@ TArray<FGameplayTag> UKMGoapAgentComponent::GetFactsTags() const
 	return Result;
 }
 
+void UKMGoapAgentComponent::InitializeStateMachineRunner()
+{
+	if (StateMachineRunnerClass &&
+		StateMachineRunnerClass->ImplementsInterface(UKMGoapAgentStateMachineInterface::StaticClass()))
+	{
+		StateMachineRunner = NewObject<UObject>(this, StateMachineRunnerClass);
+		IKMGoapAgentStateMachineInterface::Execute_Start(StateMachineRunner, this);
+		return;
+	}
+	
+	UE_LOG(LogGoapAgent, Error, TEXT("Failed to initialize state machine runner due to invalid class property"))
+}
+
 void UKMGoapAgentComponent::BeginPlay()
 {
 	Super::BeginPlay();
@@ -120,70 +134,42 @@ void UKMGoapAgentComponent::BeginPlay()
 	BuildActions();
 	BuildGoals();
 	
-	ResetExecutionState();
+	InitializeStateMachineRunner();
+}
+
+void UKMGoapAgentComponent::StopStateMachineRunner()
+{
+	if (StateMachineRunner)
+	{
+		IKMGoapAgentStateMachineInterface::Execute_Stop(StateMachineRunner);
+		StateMachineRunner = nullptr;
+	}
 }
 
 void UKMGoapAgentComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	ClearSensors();
 	ClearBeliefs();
-	ResetExecutionState();
+	StopStateMachineRunner();
 	Super::EndPlay(EndPlayReason);
-}
-
-
-void UKMGoapAgentComponent::UpdateExecutionState()
-{
-	CurrentGoal = CurrentPlan.Goal;
-			
-	CurrentAction = CurrentPlan.Actions[0];
-	CurrentPlan.Actions.RemoveAt(0);
 }
 
 void UKMGoapAgentComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
-	
-	if (!CurrentAction)
+	if (StateMachineRunner)
 	{
-		CalculatePlan();
-
-		if (CurrentPlan.IsValid())
-		{
-			UpdateExecutionState();
-			if (ValidateActionPreconditions(CurrentAction))
-			{
-				CurrentAction->StartAction(this);
-			}
-			else
-			{
-				UE_LOG(LogGoapAgent, Verbose, TEXT("Preconditions not met. Clearing current action/goal."));
-				ResetExecutionState();
-			}
-		}
-	}
-	
-	if (CurrentAction)
-	{
-		const EKMGoapActionStatus Status = CurrentAction->TickAction(this, DeltaTime);
-		if (Status == EKMGoapActionStatus::Succeeded || Status == EKMGoapActionStatus::Failed)
-		{
-			CurrentAction->StopAction(this);
-			CurrentAction = nullptr;
-
-			if (CurrentPlan.Actions.Num() == 0)
-			{
-				LastGoal = CurrentGoal;
-				ResetExecutionState();
-			}
-		}
+		IKMGoapAgentStateMachineInterface::Execute_Tick(StateMachineRunner, DeltaTime);
 	}
 }
 
 void UKMGoapAgentComponent::HandleSensorTargetChanged(FGameplayTag SourceTag)
 {
 	UE_LOG(LogGoapAgent, Display, TEXT("Target changed, clearing current action and goal."));
-	ResetExecutionState();
+	if (StateMachineRunner)
+	{
+		IKMGoapAgentStateMachineInterface::Execute_OnSensorStateUpdate(StateMachineRunner);
+	}
 	OnSensorTargetChanged(SourceTag);
 }
 
@@ -201,44 +187,6 @@ void UKMGoapAgentComponent::EvaluateBeliefs()
 		FKMGoapBeliefCacheEntry& Entry = BeliefCache.FindOrAdd(Tag);
 		Entry.BeliefTag = Tag;
 		Entry.bValue = bResult;
-	}
-}
-
-void UKMGoapAgentComponent::ResetExecutionState()
-{
-	CurrentAction = nullptr;
-	CurrentGoal = nullptr;
-	CurrentPlan.Reset();
-}
-
-void UKMGoapAgentComponent::CalculatePlan()
-{
-	float CurrentPriority = 0.f;
-	if (CurrentGoal)
-	{
-		CurrentPriority = CurrentGoal->GetPriority(this);
-	}
-
-	TArray<UKMGoapAgentGoal*> GoalsToCheck;
-	GoalsToCheck.Reserve(GoalsByTag.Num());
-
-	for (auto& Pair : GoalsByTag)
-	{
-		UKMGoapAgentGoal* Goal = Pair.Value;
-		if (!Goal) continue;
-
-		const float GoalPriority = Goal->GetPriority(this);
-
-		if (!CurrentGoal || GoalPriority > CurrentPriority)
-		{
-			GoalsToCheck.Add(Goal);
-		}
-	}
-
-	FKMGoapActionPlan NewPlan;
-	if (ComputePlanForGoals(GoalsToCheck, NewPlan) && NewPlan.IsValid())
-	{
-		CurrentPlan = MoveTemp(NewPlan);
 	}
 }
 
@@ -305,7 +253,10 @@ void UKMGoapAgentComponent::UpdateBeliefEvaluationCache()
 	EvaluateBeliefs();
 }
 
-bool UKMGoapAgentComponent::ComputePlanForGoals(const TArray<UKMGoapAgentGoal*>& GoalsToCheck, FKMGoapActionPlan& OutPlan)
+bool UKMGoapAgentComponent::ComputePlanForGoals(
+	const TArray<UKMGoapAgentGoal*>& GoalsToCheck,
+	UKMGoapAgentGoal* LastGoal,
+	FKMGoapActionPlan& OutPlan)
 {
 	UGameInstance* GameInstance = UGameplayStatics::GetGameInstance(GetWorld());
 	if (!GameInstance)
