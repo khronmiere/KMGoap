@@ -17,6 +17,15 @@ class UKMGoapGoalSet;
 class UKMGoapActionSet;
 class UKMGoapSensorComponent;
 
+USTRUCT(BlueprintType)
+struct KMGOAP_API FKMGoapBeliefCacheEntry
+{
+	GENERATED_BODY()
+	
+	FGameplayTag BeliefTag;
+	bool bValue = false;
+};
+
 UCLASS(ClassGroup=(KMGoap), meta=(BlueprintSpawnableComponent))
 class KMGOAP_API UKMGoapAgentComponent : public UActorComponent
 {
@@ -77,7 +86,7 @@ public:
 	void SetFact(FGameplayTag FactTag, bool bAdd = true);
 
 	UFUNCTION(BlueprintCallable, Category="GOAP|Facts")
-	bool GetFact(FGameplayTag Tag) const;
+	EKMGoapFactState GetFact(FGameplayTag Tag) const;
 	
 	bool ValidateActionPreconditions(const UKMGoapAgentAction* Action) const;
 
@@ -94,7 +103,15 @@ private:
 	UPROPERTY(Transient)
 	TMap<FGameplayTag, bool> Facts;
 	
+	UPROPERTY(Transient)
+	TMap<FGameplayTag, FKMGoapBeliefCacheEntry> BeliefCache;
+	
+	FTimerHandle BeliefEvaluateTimerHandle;
+	UPROPERTY(EditAnywhere, Category="GOAP|Runtime")
+	float EvaluateBeliefTimeStep = 0.03f;
+	
 	void BuildBeliefs();
+	void ClearBeliefs();
 	void BuildActions();
 	void BuildGoals();
 	void CacheSensors();
@@ -105,6 +122,8 @@ private:
 
 	UFUNCTION()
 	void HandleSensorTargetChanged(FGameplayTag SourceTag);
+	UFUNCTION()
+	void EvaluateBeliefs();
 	
 	void CalculatePlan();
 	void UpdateExecutionState();

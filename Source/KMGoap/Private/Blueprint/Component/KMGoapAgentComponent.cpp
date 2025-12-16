@@ -64,9 +64,9 @@ UKMGoapAgentAction* UKMGoapAgentComponent::GetActionByTag(FGameplayTag Tag) cons
 
 bool UKMGoapAgentComponent::EvaluateBeliefByTag(FGameplayTag Tag) const
 {
-	if (UKMGoapAgentBelief* Belief = GetBeliefByTag(Tag))
+	if (BeliefCache.Contains(Tag))
 	{
-		return Belief->Evaluate();
+		return BeliefCache[Tag].bValue;
 	}
 	return false;
 }
@@ -90,9 +90,13 @@ void UKMGoapAgentComponent::SetFact(FGameplayTag FactTag, bool bValue)
 	Facts.Add(FactTag, bValue);
 }
 
-bool UKMGoapAgentComponent::GetFact(FGameplayTag Tag) const
+EKMGoapFactState UKMGoapAgentComponent::GetFact(FGameplayTag Tag) const
 {
-	return Facts.Contains(Tag) ? Facts[Tag] : false;
+	if (Facts.Contains(Tag))
+	{
+		return Facts[Tag] ? EKMGoapFactState::Active : EKMGoapFactState::Inactive;
+	}
+	return EKMGoapFactState::Unknown;
 }
 
 void UKMGoapAgentComponent::BeginPlay()
@@ -110,6 +114,7 @@ void UKMGoapAgentComponent::BeginPlay()
 void UKMGoapAgentComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	ClearSensors();
+	ClearBeliefs();
 	ResetExecutionState();
 	Super::EndPlay(EndPlayReason);
 }
@@ -168,6 +173,25 @@ void UKMGoapAgentComponent::HandleSensorTargetChanged(FGameplayTag SourceTag)
 	UE_LOG(LogGoapAgent, Display, TEXT("Target changed, clearing current action and goal."));
 	ResetExecutionState();
 	OnSensorTargetChanged(SourceTag);
+}
+
+void UKMGoapAgentComponent::EvaluateBeliefs()
+{
+	for (const TTuple<FGameplayTag, TObjectPtr<UKMGoapAgentBelief>>& Tuple : BeliefsByTag)
+	{
+		UKMGoapAgentBelief* Belief = Tuple.Value;
+		FGameplayTag Tag = Tuple.Key;
+		if (!Belief)
+		{
+			continue;
+		}
+		bool bResult = Belief->Evaluate();
+		if (BeliefCache.Contains(Tag))
+		{
+			BeliefCache[Tag].bValue = bResult;
+		}
+		BeliefCache.Add(Tag, FKMGoapBeliefCacheEntry{Tag, bResult});
+	}
 }
 
 void UKMGoapAgentComponent::ResetExecutionState()
@@ -241,12 +265,9 @@ bool UKMGoapAgentComponent::ValidateActionPreconditions(const UKMGoapAgentAction
 	TSet<FKMGoapCondition> Missing = Preconditions;
 	for (const TTuple<FGameplayTag, bool>& Fact : Facts)
 	{
-		if (FKMGoapCondition* Item = Missing.Find(FKMGoapCondition{Fact.Key, Fact.Value}))
+		if (FKMGoapCondition* Item = Missing.Find(FKMGoapCondition{Fact.Key, !Fact.Value}))
 		{
-			if (Item->bValue != Fact.Value)
-			{
-				Missing.Remove(*Item);
-			}
+			Missing.Remove(*Item);
 		}
 	}
 	
@@ -287,6 +308,27 @@ void UKMGoapAgentComponent::BuildBeliefs()
 		BeliefsByTag,
 		[](const UKMGoapAgentBelief* Belief) { return Belief->BeliefTag; }
 	);
+
+	if (UWorld* World = GetWorld())
+	{
+		auto& TimerManager = World->GetTimerManager();
+		TimerManager.SetTimer(
+			BeliefEvaluateTimerHandle, 
+			this,
+			&UKMGoapAgentComponent::EvaluateBeliefs,
+			EvaluateBeliefTimeStep,
+			true,
+			0.f);
+	}
+}
+
+void UKMGoapAgentComponent::ClearBeliefs()
+{
+	if (UWorld* World = GetWorld())
+	{
+		auto& TimerManager = World->GetTimerManager();
+		TimerManager.ClearTimer(BeliefEvaluateTimerHandle);
+	}
 }
 
 void UKMGoapAgentComponent::BuildActions()

@@ -31,3 +31,11 @@ FORCEINLINE uint32 GetTypeHash(const FKMGoapCondition& Condition)
 {
 	return GetTypeHash(Condition.Tag);
 }
+
+UENUM(BlueprintType)
+enum class EKMGoapFactState : uint8
+{
+	Active,
+	Inactive,
+	Unknown
+};

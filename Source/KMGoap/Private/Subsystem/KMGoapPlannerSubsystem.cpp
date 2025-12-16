@@ -191,8 +191,7 @@ bool UKMGoapPlannerSubsystem::FindPath(
 		{
 			for (const FKMGoapCondition& PostCondition : ActionPostConditions)
 			{
-				FKMGoapCondition* Item = Required.Find(PostCondition);
-				if (Item && PostCondition.bValue == Item->bValue)
+				if (Required.Find(PostCondition))
 				{
 					return true;
 				}
@@ -209,10 +208,7 @@ bool UKMGoapPlannerSubsystem::FindPath(
 		{
 			if (FKMGoapCondition* Item = NewRequired.Find(ActionPostCondition))
 			{
-				if (ActionPostCondition.bValue == Item->bValue)
-				{
-					NewRequired.Remove(*Item);
-				}
+				NewRequired.Remove(*Item);
 			}
 		}
 		NewRequired.Append(Action->Preconditions);
@@ -242,7 +238,9 @@ bool UKMGoapPlannerSubsystem::IsConditionSatisfied(UKMGoapAgentComponent* Agent,
 		return false;
 	}
 	
-	if (Agent->GetFact(Condition.Tag) == Condition.bValue)
+	EKMGoapFactState FactState = Agent->GetFact(Condition.Tag);
+	EKMGoapFactState ExpectedFactState = Condition.bValue ? EKMGoapFactState::Active : EKMGoapFactState::Inactive;
+	if (FactState == ExpectedFactState)
 	{
 		return true;
 	}
