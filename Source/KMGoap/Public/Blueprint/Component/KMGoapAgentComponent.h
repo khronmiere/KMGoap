@@ -89,8 +89,8 @@ public:
 	UFUNCTION(BlueprintCallable, Category="GOAP|Facts")
 	EKMGoapFactState GetFact(FGameplayTag Tag) const;
 	
-	void FilterFactSatisfiedPreconditions(TSet<FKMGoapCondition>& Preconditions) const;
-	void FilterBeliefSatisfiedPreconditions(TSet<FKMGoapCondition>& Preconditions) const;
+	TArray<FGameplayTag> GetFactsTags() const;
+	
 	bool ValidateActionPreconditions(const UKMGoapAgentAction* Action) const;
 	void UpdateBeliefEvaluationCache();
 
@@ -123,6 +123,9 @@ private:
 
 	void BindSensorEvents(UActorComponent* Sensor);
 	void UnbindSensorEvents(UActorComponent* Sensor);
+	
+	void FilterFactSatisfiedPreconditions(TSet<FKMGoapCondition>& Preconditions) const;
+	void FilterBeliefSatisfiedPreconditions(TSet<FKMGoapCondition>& Preconditions) const;
 
 	UFUNCTION()
 	void HandleSensorTargetChanged(FGameplayTag SourceTag);

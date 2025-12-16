@@ -104,6 +104,13 @@ EKMGoapFactState UKMGoapAgentComponent::GetFact(FGameplayTag Tag) const
 	return EKMGoapFactState::Unknown;
 }
 
+TArray<FGameplayTag> UKMGoapAgentComponent::GetFactsTags() const
+{
+	TArray<FGameplayTag> Result;
+	Facts.GetKeys(Result);
+	return Result;
+}
+
 void UKMGoapAgentComponent::BeginPlay()
 {
 	Super::BeginPlay();

@@ -34,11 +34,11 @@ private:
 		FKMGoapPlanningContext& OutCtx) const;
 	
 	bool SolveGoalDijkstra(
-		const FKMGoapPlanningContext& Ctx,
+		const FKMGoapPlanningContext& Context,
 		UKMGoapAgentGoal* Goal,
 		FKMGoapActionPlan& OutPlan) const;
 	
 	static bool SatisfiesAll(const FKMGoapSimState& State, const TSet<FKMGoapCondition>& Conditions);
 	static uint32 HashState(const FKMGoapSimState& State);
-	void ApplyPostconditions(FKMGoapSimState& State, const TSet<FKMGoapCondition>& Post);
+	void ApplyPostconditions(FKMGoapSimState& State, const TSet<FKMGoapCondition>& Post) const;
 };
