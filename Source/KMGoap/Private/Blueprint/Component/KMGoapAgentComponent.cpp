@@ -7,9 +7,10 @@
 #include "Blueprint/KMGoapAgentAction.h"
 #include "Blueprint/KMGoapAgentBelief.h"
 #include "Blueprint/KMGoapAgentGoal.h"
-#include "Data/KMGoapActionSet.h"
-#include "Data/KMGoapBeliefSet.h"
-#include "Data/KMGoapGoalSet.h"
+#include "Blueprint/Data/KMGoapActionSet.h"
+#include "Blueprint/Data/KMGoapBeliefSet.h"
+#include "Blueprint/Data/KMGoapGoalSet.h"
+#include "Data/KMGoapCondition.h"
 #include "Interface/KMGoapSensorInterface.h"
 #include "Subsystem/KMGoapPlannerSubsystem.h"
 
@@ -79,20 +80,19 @@ FVector UKMGoapAgentComponent::GetBeliefLocationByTag(FGameplayTag Tag) const
 	return FVector::ZeroVector;
 }
 
-void UKMGoapAgentComponent::ApplyEffectByTag(FGameplayTag Tag, bool bValue)
+void UKMGoapAgentComponent::SetFact(FGameplayTag FactTag, bool bValue)
 {
-	if (!Tag.IsValid()) return;
-	if (bValue)
+	if (!FactTag.IsValid()) return;
+	if (Facts.Contains(FactTag))
 	{
-		Facts.AddTag(Tag);
-		return;
+		Facts[FactTag] = bValue;
 	}
-	Facts.RemoveTag(Tag);
+	Facts.Add(FactTag, bValue);
 }
 
 bool UKMGoapAgentComponent::GetFact(FGameplayTag Tag) const
 {
-	return Facts.HasTagExact(Tag);
+	return Facts.Contains(Tag) ? Facts[Tag] : false;
 }
 
 void UKMGoapAgentComponent::BeginPlay()
@@ -115,6 +115,14 @@ void UKMGoapAgentComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 }
 
 
+void UKMGoapAgentComponent::UpdateExecutionState()
+{
+	CurrentGoal = CurrentPlan.Goal;
+			
+	CurrentAction = CurrentPlan.Actions[0];
+	CurrentPlan.Actions.RemoveAt(0);
+}
+
 void UKMGoapAgentComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
@@ -125,11 +133,7 @@ void UKMGoapAgentComponent::TickComponent(float DeltaTime, ELevelTick TickType, 
 
 		if (CurrentPlan.IsValid())
 		{
-			CurrentGoal = CurrentPlan.Goal;
-			
-			CurrentAction = CurrentPlan.Actions[0];
-			CurrentPlan.Actions.RemoveAt(0);
-
+			UpdateExecutionState();
 			if (ValidateActionPreconditions(CurrentAction))
 			{
 				CurrentAction->StartAction(this);
@@ -145,7 +149,6 @@ void UKMGoapAgentComponent::TickComponent(float DeltaTime, ELevelTick TickType, 
 	if (CurrentAction)
 	{
 		const EKMGoapActionStatus Status = CurrentAction->TickAction(this, DeltaTime);
-
 		if (Status == EKMGoapActionStatus::Succeeded || Status == EKMGoapActionStatus::Failed)
 		{
 			CurrentAction->StopAction(this);
@@ -154,8 +157,7 @@ void UKMGoapAgentComponent::TickComponent(float DeltaTime, ELevelTick TickType, 
 			if (CurrentPlan.Actions.Num() == 0)
 			{
 				LastGoal = CurrentGoal;
-				CurrentGoal = nullptr;
-				CurrentPlan.Reset();
+				ResetExecutionState();
 			}
 		}
 	}
@@ -213,18 +215,44 @@ bool UKMGoapAgentComponent::ValidateActionPreconditions(const UKMGoapAgentAction
 		return false;
 	}
 
-	const FGameplayTagContainer& Preconditions = Action->Preconditions;
+	const TSet<FKMGoapCondition>& Preconditions = Action->Preconditions;
+	// We need to evaluate if the 
+	bool bContainAllInRequiredState = true;
+	for (const FKMGoapCondition& Precondition : Preconditions)
+	{
+		if (!Facts.Contains(Precondition.Tag))
+		{
+			bContainAllInRequiredState = false;
+			break;
+		}
+		
+		if (Precondition.bValue != Facts[Precondition.Tag])
+		{
+			bContainAllInRequiredState = false;
+			break;
+		}
+	}
 	
-	if (Facts.HasAllExact(Preconditions))
+	if (bContainAllInRequiredState)
 	{
 		return true;
 	}
 	
-	FGameplayTagContainer Missing = Preconditions;
-	Missing.RemoveTags(Facts);
-	for (const FGameplayTag& Tag : Missing)
+	TSet<FKMGoapCondition> Missing = Preconditions;
+	for (const TTuple<FGameplayTag, bool>& Fact : Facts)
 	{
-		if (!EvaluateBeliefByTag(Tag))
+		if (FKMGoapCondition* Item = Missing.Find(FKMGoapCondition{Fact.Key, Fact.Value}))
+		{
+			if (Item->bValue != Fact.Value)
+			{
+				Missing.Remove(*Item);
+			}
+		}
+	}
+	
+	for (const FKMGoapCondition& Condition : Missing)
+	{
+		if (EvaluateBeliefByTag(Condition.Tag) != Condition.bValue)
 		{
 			return false;
 		}
@@ -241,7 +269,7 @@ bool UKMGoapAgentComponent::ComputePlanForGoals(const TArray<UKMGoapAgentGoal*>&
 		{
 			if (UKMGoapPlannerSubsystem* Planner = GI->GetSubsystem<UKMGoapPlannerSubsystem>())
 			{
-				return Planner->Plan(this, GoalsToCheck, LastGoal, OutPlan);
+				return IKMGoapPlannerInterface::Execute_Plan(Planner, this, GoalsToCheck, LastGoal, OutPlan);
 			}
 		}
 	}

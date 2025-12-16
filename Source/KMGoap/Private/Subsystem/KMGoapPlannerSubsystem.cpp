@@ -3,12 +3,14 @@
 #include "Blueprint/Component/KMGoapAgentComponent.h"
 #include "Blueprint/KMGoapAgentGoal.h"
 #include "Blueprint/KMGoapAgentAction.h"
+#include "Data/KMGoapCondition.h"
+#include "Subsystem/Data/KMGoapActionPlan.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogGoapPlanner, Log, All);
 
 static constexpr float RecentGoalBias = 0.01f;
 
-bool UKMGoapPlannerSubsystem::Plan(
+bool UKMGoapPlannerSubsystem::Plan_Implementation(
 	UKMGoapAgentComponent* Agent,
 	const TArray<UKMGoapAgentGoal*>& GoalsToCheck,
 	UKMGoapAgentGoal* MostRecentGoal,
@@ -32,9 +34,9 @@ bool UKMGoapPlannerSubsystem::Plan(
 
 		// Only consider goals that have at least one desired effect not satisfied
 		bool bAnyUnsatisfied = false;
-		for (const FGameplayTag& DesiredTag : Goal->DesiredEffects)
+		for (const FKMGoapCondition& Condition : Goal->DesiredEffects)
 		{
-			if (!IsTagSatisfied(Agent, DesiredTag))
+			if (!IsConditionSatisfied(Agent, Condition))
 			{
 				bAnyUnsatisfied = true;
 				break;
@@ -63,9 +65,7 @@ bool UKMGoapPlannerSubsystem::Plan(
 	{
 		if (UKMGoapAgentAction* Action = Pair.Value)
 		{
-			// Optional: let actions gate themselves
-			// If you don't have CanPerform yet, delete this block or return true by default in Action.
-			if (!Action->CanPerform())
+			if (!Action->CanPerform(Agent) || !Agent->ValidateActionPreconditions(Action))
 			{
 				continue;
 			}
@@ -79,7 +79,7 @@ bool UKMGoapPlannerSubsystem::Plan(
 		return false;
 	}
 
-	SortActionsByCost(Actions);
+	SortActionsByCost(Agent, Actions);
 
 	// Try goals in priority order
 	for (UKMGoapAgentGoal* Goal : CandidateGoals)
@@ -171,13 +171,13 @@ bool UKMGoapPlannerSubsystem::FindPath(
 	}
 	
 	TArray<UKMGoapAgentAction*> OrderedActions = AvailableActions;
-	SortActionsByCost(OrderedActions);
+	SortActionsByCost(Agent, OrderedActions);
 
 	for (UKMGoapAgentAction* Action : OrderedActions)
 	{
 		if (!Action) continue;
 		
-		FGameplayTagContainer Required = Parent->Required;
+		TSet<FKMGoapCondition>& Required = Parent->Required;
 		RemoveSatisfied(Agent, Required);
 
 		if (Required.Num() == 0)
@@ -185,15 +185,37 @@ bool UKMGoapPlannerSubsystem::FindPath(
 			return true;
 		}
 		
-		const bool bProvidesAny = Action->Effects.HasAnyExact(Required);
+		TSet<FKMGoapCondition> ActionPostConditions = Action->GetPostConditions();
+		
+		const bool bProvidesAny = [&]()
+		{
+			for (const FKMGoapCondition& PostCondition : ActionPostConditions)
+			{
+				FKMGoapCondition* Item = Required.Find(PostCondition);
+				if (Item && PostCondition.bValue == Item->bValue)
+				{
+					return true;
+				}
+			}
+			return false;
+		}();
 		if (!bProvidesAny)
 		{
 			continue;
 		}
 		
-		FGameplayTagContainer NewRequired = Required;
-		NewRequired.RemoveTags(Action->Effects);
-		NewRequired.AppendTags(Action->Preconditions);
+		TSet<FKMGoapCondition> NewRequired = Required;
+		for (const FKMGoapCondition& ActionPostCondition : ActionPostConditions)
+		{
+			if (FKMGoapCondition* Item = NewRequired.Find(ActionPostCondition))
+			{
+				if (ActionPostCondition.bValue == Item->bValue)
+				{
+					NewRequired.Remove(*Item);
+				}
+			}
+		}
+		NewRequired.Append(Action->Preconditions);
 		
 		TArray<UKMGoapAgentAction*> NewAvailable = OrderedActions;
 		NewAvailable.Remove(Action);
@@ -202,7 +224,7 @@ bool UKMGoapPlannerSubsystem::FindPath(
 		Child->Parent = Parent;
 		Child->Action = Action;
 		Child->Required = NewRequired;
-		Child->Cost = Parent->Cost + Action->Cost;
+		Child->Cost = Parent->Cost + Action->GetDynamicCost(Agent);
 		
 		if (FindPath(Agent, Child, NewAvailable))
 		{
@@ -213,37 +235,40 @@ bool UKMGoapPlannerSubsystem::FindPath(
 	return Parent->Leaves.Num() > 0;
 }
 
-bool UKMGoapPlannerSubsystem::IsTagSatisfied(UKMGoapAgentComponent* Agent, const FGameplayTag& Tag) const
+bool UKMGoapPlannerSubsystem::IsConditionSatisfied(UKMGoapAgentComponent* Agent, const FKMGoapCondition& Condition) const
 {
-	if (!Agent || !Tag.IsValid())
+	if (!Agent || !Condition.Tag.IsValid())
 	{
 		return false;
 	}
 	
-	if (Agent->GetFact(Tag))
+	if (Agent->GetFact(Condition.Tag) == Condition.bValue)
 	{
 		return true;
 	}
 	
-	return Agent->EvaluateBeliefByTag(Tag);
+	return Agent->EvaluateBeliefByTag(Condition.Tag) == Condition.bValue;
 }
 
-void UKMGoapPlannerSubsystem::RemoveSatisfied(UKMGoapAgentComponent* Agent, FGameplayTagContainer& InOutRequired) const
+void UKMGoapPlannerSubsystem::RemoveSatisfied(UKMGoapAgentComponent* Agent, TSet<FKMGoapCondition>& InOutRequired) const
 {
 	if (!Agent)
 	{
 		return;
 	}
 
-	TArray<FGameplayTag> Tags;
-	InOutRequired.GetGameplayTagArray(Tags);
-
-	for (const FGameplayTag& Tag : Tags)
+	TArray<FKMGoapCondition> ToRemove;
+	for (FKMGoapCondition& Required : InOutRequired)
 	{
-		if (IsTagSatisfied(Agent, Tag))
+		if (IsConditionSatisfied(Agent, Required))
 		{
-			InOutRequired.RemoveTag(Tag);
+			ToRemove.Add(Required);
 		}
+	}
+	
+	for (const FKMGoapCondition& Remove : ToRemove)
+	{
+		InOutRequired.Remove(Remove);
 	}
 }
 
@@ -258,10 +283,10 @@ void UKMGoapPlannerSubsystem::SortGoals(UKMGoapAgentComponent* Agent, TArray<UKM
 	});
 }
 
-void UKMGoapPlannerSubsystem::SortActionsByCost(TArray<UKMGoapAgentAction*>& InOutActions)
+void UKMGoapPlannerSubsystem::SortActionsByCost(const UKMGoapAgentComponent* Agent, TArray<UKMGoapAgentAction*>& InOutActions)
 {
-	InOutActions.Sort([](const UKMGoapAgentAction& A, const UKMGoapAgentAction& B)
+	InOutActions.Sort([Agent](const UKMGoapAgentAction& A, const UKMGoapAgentAction& B)
 	{
-		return A.Cost < B.Cost;
+		return A.GetDynamicCost(Agent) < B.GetDynamicCost(Agent);
 	});
 }

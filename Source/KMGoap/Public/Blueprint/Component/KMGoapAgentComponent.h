@@ -5,8 +5,10 @@
 #include "CoreMinimal.h"
 #include "GameplayTagContainer.h"
 #include "Components/ActorComponent.h"
+#include "Subsystem/Data/KMGoapActionPlan.h"
 #include "KMGoapAgentComponent.generated.h"
 
+struct FKMGoapCondition;
 class UKMGoapAgentAction;
 class UKMGoapBeliefSet;
 class UKMGoapAgentGoal;
@@ -14,21 +16,6 @@ class UKMGoapAgentBelief;
 class UKMGoapGoalSet;
 class UKMGoapActionSet;
 class UKMGoapSensorComponent;
-
-USTRUCT(BlueprintType)
-struct FKMGoapActionPlan
-{
-	GENERATED_BODY()
-
-	UPROPERTY(BlueprintReadOnly)
-	TObjectPtr<UKMGoapAgentGoal> Goal = nullptr;
-
-	UPROPERTY(BlueprintReadOnly)
-	TArray<TObjectPtr<UKMGoapAgentAction>> Actions; // front = first
-	
-	bool IsValid() const { return Goal != nullptr && Actions.Num() > 0; }
-	void Reset() { Goal = nullptr; Actions.Reset(); }
-};
 
 UCLASS(ClassGroup=(KMGoap), meta=(BlueprintSpawnableComponent))
 class KMGOAP_API UKMGoapAgentComponent : public UActorComponent
@@ -87,7 +74,7 @@ public:
 	FVector GetBeliefLocationByTag(FGameplayTag Tag) const;
 	
 	UFUNCTION(BlueprintCallable, Category="GOAP|Facts")
-	void ApplyEffectByTag(FGameplayTag Tag, bool bValue = true);
+	void SetFact(FGameplayTag FactTag, bool bAdd = true);
 
 	UFUNCTION(BlueprintCallable, Category="GOAP|Facts")
 	bool GetFact(FGameplayTag Tag) const;
@@ -105,9 +92,8 @@ protected:
 
 private:
 	UPROPERTY(Transient)
-	FGameplayTagContainer Facts;
-
-	// Internal helpers
+	TMap<FGameplayTag, bool> Facts;
+	
 	void BuildBeliefs();
 	void BuildActions();
 	void BuildGoals();
@@ -121,6 +107,7 @@ private:
 	void HandleSensorTargetChanged(FGameplayTag SourceTag);
 	
 	void CalculatePlan();
+	void UpdateExecutionState();
 	void ResetExecutionState();
 	bool ComputePlanForGoals(const TArray<UKMGoapAgentGoal*>& GoalsToCheck, FKMGoapActionPlan& OutPlan);
 	

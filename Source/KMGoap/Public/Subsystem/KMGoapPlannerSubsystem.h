@@ -3,14 +3,13 @@
 #include "CoreMinimal.h"
 #include "Subsystems/GameInstanceSubsystem.h"
 #include "GameplayTagContainer.h"
+#include "Interface/KMGoapPlannerInterface.h"
 #include "KMGoapPlannerSubsystem.generated.h"
 
+struct FKMGoapCondition;
 class UKMGoapAgentGoal;
 class UKMGoapAgentAction;
 class UKMGoapAgentComponent;
-
-// Forward-declare your plan struct (defined in AgentComponent.h)
-struct FKMGoapActionPlan;
 
 /**
  * UGoapPlannerSubsystem
@@ -19,24 +18,23 @@ struct FKMGoapActionPlan;
  * Computes a plan for an agent given a set of candidate goals.
  */
 UCLASS(Category="KMGoap")
-class KMGOAP_API UKMGoapPlannerSubsystem : public UGameInstanceSubsystem
+class KMGOAP_API UKMGoapPlannerSubsystem : public UGameInstanceSubsystem, public IKMGoapPlannerInterface
 {
 	GENERATED_BODY()
 
 public:
-	UFUNCTION(BlueprintCallable, Category="KMGoap")
-	bool Plan(
+	virtual bool Plan_Implementation(
 		UKMGoapAgentComponent* Agent,
 		const TArray<UKMGoapAgentGoal*>& GoalsToCheck,
 		UKMGoapAgentGoal* MostRecentGoal,
-		FKMGoapActionPlan& OutPlan);
+		FKMGoapActionPlan& OutPlan) override;
 
 private:
 	struct FGoapNode
 	{
 		TSharedPtr<FGoapNode> Parent;
 		TObjectPtr<UKMGoapAgentAction> Action = nullptr;
-		FGameplayTagContainer Required;      // tags that must become true
+		TSet<FKMGoapCondition> Required;      // tags that must become true
 		float Cost = 0.f;
 		TArray<TSharedPtr<FGoapNode>> Leaves;
 
@@ -50,10 +48,10 @@ private:
 		const TArray<UKMGoapAgentAction*>& AvailableActions);
 
 	// Helpers
-	bool IsTagSatisfied(UKMGoapAgentComponent* Agent, const FGameplayTag& Tag) const;
-	void RemoveSatisfied(UKMGoapAgentComponent* Agent, FGameplayTagContainer& InOutRequired) const;
+	bool IsConditionSatisfied(UKMGoapAgentComponent* Agent, const FKMGoapCondition& Condition) const;
+	void RemoveSatisfied(UKMGoapAgentComponent* Agent, TSet<FKMGoapCondition>& InOutRequired) const;
 
 	// Ordering
 	static void SortGoals(UKMGoapAgentComponent* Agent, TArray<UKMGoapAgentGoal*>& InOutGoals, UKMGoapAgentGoal* MostRecentGoal);
-	static void SortActionsByCost(TArray<UKMGoapAgentAction*>& InOutActions);
+	static void SortActionsByCost(const UKMGoapAgentComponent* Agent, TArray<UKMGoapAgentAction*>& InOutActions);
 };

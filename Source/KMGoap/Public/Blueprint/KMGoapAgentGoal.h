@@ -7,6 +7,7 @@
 #include "UObject/Object.h"
 #include "KMGoapAgentGoal.generated.h"
 
+struct FKMGoapCondition;
 class UKMGoapAgentComponent;
 
 /**
@@ -25,7 +26,7 @@ public:
 	float BasePriority = 1.f;
 	
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Goal")
-	FGameplayTagContainer DesiredEffects;
+	TSet<FKMGoapCondition> DesiredEffects;
 	
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category="Goal")
 	float GetPriority(UKMGoapAgentComponent* Agent) const { return Native_GetPriority(Agent); }

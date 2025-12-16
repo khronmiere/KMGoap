@@ -5,8 +5,11 @@
 #include "CoreMinimal.h"
 #include "GameplayTagContainer.h"
 #include "UObject/Object.h"
+#include "Data/KMGoapCondition.h"
 #include "KMGoapAgentAction.generated.h"
 
+struct FKMGoapCondition;
+struct FKMGoapActionPlan;
 class UKMGoapAgentComponent;
 
 UENUM(BlueprintType)
@@ -38,13 +41,16 @@ public:
 	FGameplayTag ActionTag;
 	
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Action", meta=(ClampMin="0.0"))
-	float Cost = 1.f;
+	float BaseCost = 1.f;
 	
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Action")
-	FGameplayTagContainer Preconditions;
+	TSet<FKMGoapCondition> Preconditions;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Action")
-	FGameplayTagContainer Effects;
+	TSet<FKMGoapCondition> Effects;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Action")
+	TSet<FKMGoapCondition> Facts;
 	
 	UFUNCTION(BlueprintCallable, Category="Action")
 	void StartAction(UKMGoapAgentComponent* Agent);
@@ -61,9 +67,16 @@ public:
 	UFUNCTION(BlueprintCallable, Category="Action")
 	EKMGoapActionStatus GetStatus() const { return Status; }
 	
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category="Action")
+	TSet<FKMGoapCondition> GetPostConditions() const;
+	
 	UFUNCTION(BlueprintNativeEvent, Category="Action", meta=(BlueprintProtected="true"))
-	bool CanPerform() const;
-	virtual bool CanPerform_Implementation() const;
+	bool CanPerform(UKMGoapAgentComponent* Agent) const;
+	virtual bool CanPerform_Implementation(UKMGoapAgentComponent* Agent) const;
+	
+	UFUNCTION(BlueprintNativeEvent, Category = "Action")
+	float GetDynamicCost(const UKMGoapAgentComponent* Agent) const;
+	float GetDynamicCost_Implementation(const UKMGoapAgentComponent* Agent) const {return BaseCost;}
 
 protected:
 	UPROPERTY(Transient)
@@ -81,5 +94,5 @@ protected:
 	void OnStop(UKMGoapAgentComponent* Agent);
 	virtual void OnStop_Implementation(UKMGoapAgentComponent* Agent) {}
 	
-	void ApplyEffects(UKMGoapAgentComponent* Agent) const;
+	void ApplyFacts(UKMGoapAgentComponent* Agent) const;
 };

@@ -13,7 +13,7 @@ void UKMGoapAgentAction::StartAction(UKMGoapAgentComponent* Agent)
 
 EKMGoapActionStatus UKMGoapAgentAction::TickAction(UKMGoapAgentComponent* Agent, float DeltaTime)
 {
-	if (Status != EKMGoapActionStatus::Running || !CanPerform())
+	if (Status != EKMGoapActionStatus::Running || !CanPerform(Agent))
 	{
 		return Status;
 	}
@@ -27,7 +27,7 @@ EKMGoapActionStatus UKMGoapAgentAction::TickAction(UKMGoapAgentComponent* Agent,
 	Status = NewStatus;
 	if (Status == EKMGoapActionStatus::Succeeded)
 	{
-		ApplyEffects(Agent);
+		ApplyFacts(Agent);
 	}
 
 	return Status;
@@ -42,9 +42,16 @@ void UKMGoapAgentAction::StopAction(UKMGoapAgentComponent* Agent)
 	}
 }
 
-bool UKMGoapAgentAction::CanPerform_Implementation() const
+TSet<FKMGoapCondition> UKMGoapAgentAction::GetPostConditions() const
 {
-	return true;
+	TSet<FKMGoapCondition> PostConditions = Effects;
+	PostConditions.Append(Facts);
+	return PostConditions;
+}
+
+bool UKMGoapAgentAction::CanPerform_Implementation(UKMGoapAgentComponent* Agent) const
+{
+	return false;
 }
 
 EKMGoapActionStatus UKMGoapAgentAction::OnTick_Implementation(UKMGoapAgentComponent* Agent, float DeltaTime)
@@ -52,15 +59,11 @@ EKMGoapActionStatus UKMGoapAgentAction::OnTick_Implementation(UKMGoapAgentCompon
 	return EKMGoapActionStatus::Succeeded;
 }
 
-void UKMGoapAgentAction::ApplyEffects(UKMGoapAgentComponent* Agent) const
+void UKMGoapAgentAction::ApplyFacts(UKMGoapAgentComponent* Agent) const
 {
 	if (!Agent) return;
-
-	// For each effect tag, tell the agent to "apply" it.
-	// You need to define what "apply" means in your system.
-	// Typical: mark a world state key, or force a belief to become true, etc.
-	for (const FGameplayTag& Tag : Effects)
+	for (const FKMGoapCondition& Fact : Facts)
 	{
-		Agent->ApplyEffectByTag(Tag);
+		Agent->SetFact(Fact.Tag, Fact.bValue);
 	}
 }
