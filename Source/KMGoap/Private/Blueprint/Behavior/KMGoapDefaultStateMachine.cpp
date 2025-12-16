@@ -43,6 +43,12 @@ void UKMGoapDefaultStateMachine::Tick_Implementation(float DeltaTime)
 	
 	if (CurrentAction)
 	{
+		if (!Agent->ValidateActionPreconditions(CurrentAction))
+		{
+			ResetExecutionState();
+			return;
+		}
+		
 		const EKMGoapActionStatus Status = CurrentAction->TickAction(Agent, DeltaTime);
 		if (Status == EKMGoapActionStatus::Succeeded || Status == EKMGoapActionStatus::Failed)
 		{
