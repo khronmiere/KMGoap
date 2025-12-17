@@ -3,10 +3,9 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Data/KMGoapPlannerConfig.h"
 #include "Engine/DeveloperSettings.h"
 #include "KMGoapSettings.generated.h"
-
-class UKMGoapPlannerConfig;
 
 UCLASS(Config=Game, DefaultConfig, meta=(DisplayName="KMGoap"))
 class KMGOAP_API UKMGoapSettings : public UDeveloperSettings
@@ -15,6 +14,7 @@ class KMGOAP_API UKMGoapSettings : public UDeveloperSettings
 
 public:
 	// Path to a planner config asset.
-	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Planning")
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Planning",
+		meta=(AllowedClasses="/Script/KMGoap.KMGoapPlannerConfig"))
 	TSoftObjectPtr<UKMGoapPlannerConfig> PlannerConfig;
 };

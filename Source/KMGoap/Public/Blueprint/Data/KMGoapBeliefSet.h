@@ -6,7 +6,7 @@
 #include "Engine/DataAsset.h"
 #include "KMGoapBeliefSet.generated.h"
 
-UCLASS(Category = "KMGoap|Data", BlueprintType)
+UCLASS(Category = "KMGoap|Data", BlueprintType, Blueprintable)
 class KMGOAP_API UKMGoapBeliefSet : public UDataAsset
 {
 	GENERATED_BODY()

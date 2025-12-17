@@ -26,7 +26,7 @@ void UKMGoapPlannerSubsystem::CreateAlgorithmFromConfig()
 	{
 		return;
 	}
-
+	
 	LoadedConfig = Settings->PlannerConfig.LoadSynchronous();
 	if (!LoadedConfig)
 	{

@@ -36,7 +36,7 @@ class KMGOAP_API UKMGoapAgentComponent : public UActorComponent
 public:
 	UKMGoapAgentComponent();
 	
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="GOAP")
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="GOAP|Sets")
 	TObjectPtr<UKMGoapBeliefSet> BeliefSet;
 	UPROPERTY(Transient, BlueprintReadOnly, Category="GOAP")
 	TMap<FGameplayTag, TObjectPtr<UKMGoapAgentBelief>> BeliefsByTag;

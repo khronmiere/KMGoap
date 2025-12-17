@@ -11,7 +11,7 @@
 /**
  * 
  */
-UCLASS(Category = "KMGoap|ActorComponents", Abstract, BlueprintType, Blueprintable, meta=(BlueprintSpawnableComponent))
+UCLASS(ClassGroup=(KMGoap), Category = "KMGoap|ActorComponents", Abstract, BlueprintType, Blueprintable, meta=(BlueprintSpawnableComponent))
 class KMGOAP_API UKMGoapSensorComponent : public UActorComponent, public IKMGoapSensorInterface
 {
 	GENERATED_BODY()

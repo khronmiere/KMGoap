@@ -9,7 +9,7 @@
 /**
  * 
  */
-UCLASS(Category = "KMGoap|Data", BlueprintType)
+UCLASS(Category = "KMGoap|Data", BlueprintType, Blueprintable)
 class KMGOAP_API UKMGoapActionSet : public UDataAsset
 {
 	GENERATED_BODY()

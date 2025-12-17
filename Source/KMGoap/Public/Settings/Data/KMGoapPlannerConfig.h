@@ -4,14 +4,13 @@
 
 #include "CoreMinimal.h"
 #include "Engine/DataAsset.h"
+#include "Subsystem/Behavior/Concretions/KMGoapPlanSearch_Dijkstra.h"
 #include "KMGoapPlannerConfig.generated.h"
-
-class UKMGoapPlanSearchBase;
 
 /**
  * 
  */
-UCLASS(BlueprintType)
+UCLASS(BlueprintType, Blueprintable)
 class KMGOAP_API UKMGoapPlannerConfig : public UDataAsset
 {
 	GENERATED_BODY()
@@ -19,7 +18,7 @@ class KMGOAP_API UKMGoapPlannerConfig : public UDataAsset
 public:
 	// Which algorithm to instantiate at runtime.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="KMGoap|Planning")
-	TSubclassOf<UKMGoapPlanSearchBase> SearchAlgorithmClass;
+	TSubclassOf<UKMGoapPlanSearchBase> SearchAlgorithmClass = UKMGoapPlanSearch_Dijkstra::StaticClass();
 
 	// Optional: default instance tuning (applied after creation).
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="KMGoap|Planning")
