@@ -10,7 +10,7 @@ class UKMGoapAgentComponent;
 
 // This class does not need to be modified.
 UINTERFACE()
-class UKMGoapAgentStateMachineInterface : public UInterface
+class KMGOAP_API UKMGoapAgentStateMachineInterface : public UInterface
 {
 	GENERATED_BODY()
 };

@@ -27,8 +27,7 @@ UKMGoapAgentComponent::UKMGoapAgentComponent()
 	// Set this component to be initialized when the game starts, and to be ticked every frame.  You can turn these features
 	// off to improve performance if you don't need them.
 	PrimaryComponentTick.bCanEverTick = true;
-
-	// ...
+	StateMachineRunnerClass = UKMGoapDefaultStateMachine::StaticClass();
 }
 
 UKMGoapAgentBelief* UKMGoapAgentComponent::GetBeliefByTag(FGameplayTag Tag) const
@@ -114,6 +113,7 @@ TArray<FGameplayTag> UKMGoapAgentComponent::GetFactsTags() const
 
 void UKMGoapAgentComponent::InitializeStateMachineRunner()
 {
+	UE_LOG(LogGoapAgent, Log, TEXT("Initializing StateMachine Runner"));
 	if (StateMachineRunnerClass &&
 		StateMachineRunnerClass->ImplementsInterface(UKMGoapAgentStateMachineInterface::StaticClass()))
 	{

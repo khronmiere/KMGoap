@@ -109,7 +109,7 @@ private:
 	float EvaluateBeliefTimeStep = 0.03f;
 	
 	UPROPERTY(EditAnywhere, Category="GOAP|Runtime", meta=(MustImplement="/Script/KMGoap.KMGoapAgentStateMachineInterface"))
-	TSubclassOf<UObject> StateMachineRunnerClass = UKMGoapDefaultStateMachine::StaticClass();
+	TSubclassOf<UObject> StateMachineRunnerClass;
 	UPROPERTY(Transient)
 	TObjectPtr<UObject> StateMachineRunner = nullptr;
 	

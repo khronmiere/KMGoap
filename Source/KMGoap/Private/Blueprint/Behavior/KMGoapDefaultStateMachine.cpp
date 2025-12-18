@@ -13,17 +13,20 @@ void UKMGoapDefaultStateMachine::Start_Implementation(UKMGoapAgentComponent* New
 {
 	Agent = NewAgent;
 	ResetExecutionState();
+	UE_LOG(LogGoapDefaultStateMachine, Log, TEXT("State Machine Started"));
 }
 
 void UKMGoapDefaultStateMachine::Stop_Implementation()
 {
 	ResetExecutionState();
+	UE_LOG(LogGoapDefaultStateMachine, Log, TEXT("State Machine Stopped"));
 }
 
 void UKMGoapDefaultStateMachine::Tick_Implementation(float DeltaTime)
 {
 	if (!CurrentAction)
 	{
+		UE_LOG(LogGoapDefaultStateMachine, Log, TEXT("No Action, Calculating a new Plan"));
 		CalculatePlan();
 
 		if (CurrentPlan.IsValid())
@@ -35,7 +38,7 @@ void UKMGoapDefaultStateMachine::Tick_Implementation(float DeltaTime)
 			}
 			else
 			{
-				UE_LOG(LogGoapDefaultStateMachine, Verbose, TEXT("Preconditions not met. Clearing current action/goal."));
+				UE_LOG(LogGoapDefaultStateMachine, Log, TEXT("Preconditions not met. Clearing current action/goal."));
 				ResetExecutionState();
 			}
 		}
@@ -43,6 +46,7 @@ void UKMGoapDefaultStateMachine::Tick_Implementation(float DeltaTime)
 	
 	if (CurrentAction)
 	{
+		UE_LOG(LogGoapDefaultStateMachine, Log, TEXT("Tick %s"), *CurrentAction->GetName());
 		if (!Agent->ValidateActionPreconditions(CurrentAction))
 		{
 			ResetExecutionState();
