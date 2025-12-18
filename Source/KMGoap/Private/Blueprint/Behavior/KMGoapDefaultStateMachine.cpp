@@ -49,8 +49,8 @@ void UKMGoapDefaultStateMachine::Tick_Implementation(float DeltaTime)
 			return;
 		}
 		
-		const EKMGoapActionStatus Status = CurrentAction->TickAction(Agent, DeltaTime);
-		if (Status == EKMGoapActionStatus::Succeeded || Status == EKMGoapActionStatus::Failed)
+		CurrentAction->TickAction(Agent, DeltaTime);
+		if (CurrentAction->IsComplete())
 		{
 			CurrentAction->StopAction(Agent);
 			CurrentAction = nullptr;
