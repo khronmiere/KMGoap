@@ -6,38 +6,24 @@
 #include "Blueprint/Component/KMGoapAgentComponent.h"
 #include "Interface/KMGoapSensorInterface.h"
 
-UActorComponent* UKMGoapAgentSensorBelief::GetCachedSensor() const
+UActorComponent* UKMGoapAgentSensorBelief::GetCachedSensor(const UKMGoapAgentComponent* Agent) const
 {
-	return ResolveSensor();
+	return ResolveSensor(Agent);
 }
 
-UActorComponent* UKMGoapAgentSensorBelief::ResolveSensor() const
+UActorComponent* UKMGoapAgentSensorBelief::ResolveSensor(const UKMGoapAgentComponent* Agent) const
 {
 	if (CachedSensor.IsValid())
 	{
 		return CachedSensor.Get();
 	}
 
-	if (!SensorTag.IsValid())
+	if (!SensorTag.IsValid() || !Agent)
 	{
 		return nullptr;
 	}
 	
-	UKMGoapAgentComponent* AgentComp = GetTypedOuter<UKMGoapAgentComponent>();
-	if (!AgentComp)
-	{
-		if (const AActor* OwnerActor = GetTypedOuter<AActor>())
-		{
-			AgentComp = OwnerActor->FindComponentByClass<UKMGoapAgentComponent>();
-		}
-	}
-
-	if (!AgentComp)
-	{
-		return nullptr;
-	}
-
-	UActorComponent* Sensor = AgentComp->GetSensorByTag(SensorTag);
+	UActorComponent* Sensor = Agent->GetSensorByTag(SensorTag);
 	if (!Sensor)
 	{
 		return nullptr;
@@ -53,38 +39,38 @@ UActorComponent* UKMGoapAgentSensorBelief::ResolveSensor() const
 	return Sensor;
 }
 
-FVector UKMGoapAgentSensorBelief::SensorTargetPosition() const
+FVector UKMGoapAgentSensorBelief::SensorTargetPosition(const UKMGoapAgentComponent* Agent) const
 {
-	if (UActorComponent* Sensor = ResolveSensor())
+	if (UActorComponent* Sensor = ResolveSensor(Agent))
 	{
 		return IKMGoapSensorInterface::Execute_GetTargetPosition(Sensor);
 	}
 	return FVector::ZeroVector;
 }
 
-bool UKMGoapAgentSensorBelief::Native_Condition() const
+bool UKMGoapAgentSensorBelief::Native_Condition(const UKMGoapAgentComponent* Agent) const
 {
-	if (UActorComponent* Sensor = ResolveSensor())
+	if (UActorComponent* Sensor = ResolveSensor(Agent))
 	{
 		if (IKMGoapSensorInterface::Execute_HasTarget(Sensor))
 		{
-			return Super::Native_Condition();
+			return Super::Native_Condition(Agent);
 		}
 	}
 	return false;
 }
 
-bool UKMGoapAgentSensorBelief::Condition_Implementation() const
+bool UKMGoapAgentSensorBelief::Condition_Implementation(const UKMGoapAgentComponent* Agent) const
 {
 	return true;
 }
 
-FVector UKMGoapAgentSensorBelief::Native_ObservedLocation() const
+FVector UKMGoapAgentSensorBelief::Native_ObservedLocation(const UKMGoapAgentComponent* Agent) const
 {
 	if (bUseRawTargetLocation)
 	{
-		return SensorTargetPosition();
+		return SensorTargetPosition(Agent);
 	}
 	
-	return Super::Native_ObservedLocation();
+	return Super::Native_ObservedLocation(Agent);
 }

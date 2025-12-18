@@ -7,6 +7,7 @@
 #include "UObject/Object.h"
 #include "KMGoapAgentBelief.generated.h"
 
+class UKMGoapAgentComponent;
 /**
  * UAgentBelief
  *
@@ -29,19 +30,19 @@ public:
 	FGameplayTag BeliefTag;
 	
 	UFUNCTION(BlueprintCallable, Category="Belief")
-	FVector GetLocation() const { return Native_ObservedLocation(); }
+	FVector GetLocation(const UKMGoapAgentComponent* Agent) const { return Native_ObservedLocation(Agent); }
 	
 	UFUNCTION(BlueprintCallable, Category="Belief")
-	bool Evaluate() const { return Native_Condition(); }
+	bool Evaluate(const UKMGoapAgentComponent* Agent) const { return Native_Condition(Agent); }
 	
 protected:
-	virtual bool Native_Condition() const;
+	virtual bool Native_Condition(const UKMGoapAgentComponent* Agent) const;
 	UFUNCTION(BlueprintNativeEvent, Category="Belief")
-	bool Condition() const;
-	virtual bool Condition_Implementation() const;
+	bool Condition(const UKMGoapAgentComponent* Agent) const;
+	virtual bool Condition_Implementation(const UKMGoapAgentComponent* Agent) const;
 	
-	virtual FVector Native_ObservedLocation() const;
+	virtual FVector Native_ObservedLocation(const UKMGoapAgentComponent* Agent) const;
 	UFUNCTION(BlueprintNativeEvent, Category="Belief")
-	FVector ObservedLocation() const;
-	virtual FVector ObservedLocation_Implementation() const;
+	FVector ObservedLocation(const UKMGoapAgentComponent* Agent) const;
+	virtual FVector ObservedLocation_Implementation(const UKMGoapAgentComponent* Agent) const;
 };

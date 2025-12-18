@@ -22,9 +22,6 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Goal")
 	FGameplayTag GoalTag;
 	
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Goal", meta=(ClampMin="0.0"))
-	float BasePriority = 1.f;
-	
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Goal")
 	TSet<FKMGoapCondition> DesiredEffects;
 	
@@ -32,6 +29,9 @@ public:
 	float GetPriority(UKMGoapAgentComponent* Agent) const { return Native_GetPriority(Agent); }
 
 protected:
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Goal", meta=(ClampMin="0.0"))
+	float BasePriority = 1.f;
+	
 	virtual float Native_GetPriority(UKMGoapAgentComponent* Agent) const;
 	UFUNCTION(BlueprintNativeEvent, Category="Goal", meta=(BlueprintProtected="true"))
 	float Priority(UKMGoapAgentComponent* Agent) const;

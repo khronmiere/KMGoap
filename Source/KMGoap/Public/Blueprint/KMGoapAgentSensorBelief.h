@@ -19,7 +19,7 @@ public:
 	FGameplayTag SensorTag;
 	
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category="KMGoap")
-	UActorComponent* GetCachedSensor() const;
+	UActorComponent* GetCachedSensor(const UKMGoapAgentComponent* Agent) const;
 
 protected:
 	// Cached resolved sensor (runtime)
@@ -29,11 +29,11 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Belief")
 	bool bUseRawTargetLocation;
 	
-	UActorComponent* ResolveSensor() const;
+	UActorComponent* ResolveSensor(const UKMGoapAgentComponent* Agent) const;
 	
-	FVector SensorTargetPosition() const;
+	FVector SensorTargetPosition(const UKMGoapAgentComponent* Agent) const;
 	
-	virtual bool Native_Condition() const override;
-	virtual bool Condition_Implementation() const override;
-	virtual FVector Native_ObservedLocation() const override;
+	virtual bool Native_Condition(const UKMGoapAgentComponent* Agent) const override;
+	virtual bool Condition_Implementation(const UKMGoapAgentComponent* Agent) const override;
+	virtual FVector Native_ObservedLocation(const UKMGoapAgentComponent* Agent) const override;
 };

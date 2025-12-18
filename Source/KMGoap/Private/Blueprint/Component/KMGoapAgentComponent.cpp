@@ -84,7 +84,7 @@ FVector UKMGoapAgentComponent::GetBeliefLocationByTag(FGameplayTag Tag) const
 {
 	if (UKMGoapAgentBelief* Belief = GetBeliefByTag(Tag))
 	{
-		return Belief->GetLocation();
+		return Belief->GetLocation(this);
 	}
 	return FVector::ZeroVector;
 }
@@ -183,7 +183,7 @@ void UKMGoapAgentComponent::EvaluateBeliefs()
 		{
 			continue;
 		}
-		bool bResult = Belief->Evaluate();
+		bool bResult = Belief->Evaluate(this);
 		FKMGoapBeliefCacheEntry& Entry = BeliefCache.FindOrAdd(Tag);
 		Entry.BeliefTag = Tag;
 		Entry.bValue = bResult;
