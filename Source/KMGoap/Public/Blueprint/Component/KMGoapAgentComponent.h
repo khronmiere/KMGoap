@@ -28,7 +28,7 @@ struct KMGOAP_API FKMGoapBeliefCacheEntry
 	bool bValue = false;
 };
 
-UCLASS(ClassGroup=(KMGoap), meta=(BlueprintSpawnableComponent))
+UCLASS(ClassGroup=(KMGoap), BlueprintType, Blueprintable, meta=(BlueprintSpawnableComponent))
 class KMGOAP_API UKMGoapAgentComponent : public UActorComponent
 {
 	GENERATED_BODY()
