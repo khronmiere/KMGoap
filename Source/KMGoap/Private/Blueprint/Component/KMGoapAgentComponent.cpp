@@ -67,17 +67,17 @@ UKMGoapAgentAction* UKMGoapAgentComponent::GetActionByTag(FGameplayTag Tag) cons
 	return nullptr;
 }
 
-bool UKMGoapAgentComponent::EvaluateBeliefByTag(FGameplayTag Tag) const
+EKMGoapBeliefState UKMGoapAgentComponent::EvaluateBeliefByTag(FGameplayTag Tag) const
 {
 	if (auto CacheEntry = BeliefCache.Find(Tag))
 	{
-		return CacheEntry->bValue;
+		return CacheEntry->bValue ? EKMGoapBeliefState::Positive : EKMGoapBeliefState::Negative;
 	}
 	
 	UE_LOG(LogGoapAgent, Error,
 		TEXT("Belief not present in Cache. Are we evaluating beliefs not added in the Set?, Requested Belief with tag %s"),
 		*Tag.ToString());
-	return false;
+	return EKMGoapBeliefState::Unknown;
 }
 
 FVector UKMGoapAgentComponent::GetBeliefLocationByTag(FGameplayTag Tag) const
@@ -96,13 +96,13 @@ void UKMGoapAgentComponent::SetFact(FGameplayTag FactTag, bool bNewValue)
 	bCurrentFactValue = bNewValue;
 }
 
-EKMGoapFactState UKMGoapAgentComponent::GetFact(FGameplayTag Tag) const
+EKMGoapBeliefState UKMGoapAgentComponent::GetFact(FGameplayTag Tag) const
 {
 	if (const bool* bValue = Facts.Find(Tag))
 	{
-		return *bValue ? EKMGoapFactState::Active : EKMGoapFactState::Inactive;
+		return *bValue ? EKMGoapBeliefState::Positive : EKMGoapBeliefState::Negative;
 	}
-	return EKMGoapFactState::Unknown;
+	return EKMGoapBeliefState::Unknown;
 }
 
 TArray<FGameplayTag> UKMGoapAgentComponent::GetFactsTags() const
@@ -159,7 +159,7 @@ void UKMGoapAgentComponent::StopStateMachineRunner()
 
 void UKMGoapAgentComponent::InitializeKnowledgeRuntime()
 {
-	KnowledgeRuntime = NewObject<UKMGoapKnowledgeRuntime>();
+	KnowledgeRuntime = NewObject<UKMGoapKnowledgeRuntime>(this);
 }
 
 void UKMGoapAgentComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -195,6 +195,8 @@ void UKMGoapAgentComponent::HandleSensorTargetChanged(FGameplayTag SourceTag)
 
 void UKMGoapAgentComponent::EvaluateBeliefs()
 {
+	BeliefCache.Reset();
+	BeliefCache.Reserve(BeliefsByTag.Num());
 	for (const TTuple<FGameplayTag, TObjectPtr<UKMGoapAgentBelief>>& Tuple : BeliefsByTag)
 	{
 		UKMGoapAgentBelief* Belief = Tuple.Value;
@@ -243,7 +245,8 @@ void UKMGoapAgentComponent::FilterBeliefSatisfiedPreconditions(TSet<FKMGoapCondi
 			continue;
 		}
 		
-		if (EvaluateBeliefByTag(Precondition.Tag) == Precondition.bValue)
+		EKMGoapBeliefState ExpectedState = Precondition.bValue ? EKMGoapBeliefState::Positive : EKMGoapBeliefState::Negative;
+		if (EvaluateBeliefByTag(Precondition.Tag) == ExpectedState)
 		{
 			ToRemove.Add(Precondition);
 		}

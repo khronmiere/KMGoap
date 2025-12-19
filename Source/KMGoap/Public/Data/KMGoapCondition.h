@@ -33,9 +33,9 @@ FORCEINLINE uint32 GetTypeHash(const FKMGoapCondition& Condition)
 }
 
 UENUM(BlueprintType)
-enum class EKMGoapFactState : uint8
+enum class EKMGoapBeliefState : uint8
 {
-	Active,
-	Inactive,
+	Positive,
+	Negative,
 	Unknown
 };

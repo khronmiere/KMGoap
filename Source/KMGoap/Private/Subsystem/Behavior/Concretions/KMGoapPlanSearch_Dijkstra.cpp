@@ -43,8 +43,8 @@ namespace
 			return false;
 		}
 
-		const EKMGoapFactState FactState = Agent->GetFact(Condition.Tag);
-		const EKMGoapFactState Expected = Condition.bValue ? EKMGoapFactState::Active : EKMGoapFactState::Inactive;
+		const EKMGoapBeliefState FactState = Agent->GetFact(Condition.Tag);
+		const EKMGoapBeliefState Expected = Condition.bValue ? EKMGoapBeliefState::Positive : EKMGoapBeliefState::Negative;
 
 		return FactState == Expected;
 	}
@@ -121,8 +121,8 @@ bool UKMGoapPlanSearch_Dijkstra::BuildContext(
 		auto FactsTags = Agent->GetFactsTags();
 		for (const FGameplayTag& Tag : FactsTags)
 		{
-			EKMGoapFactState FactState = Agent->GetFact(Tag);
-			OutCtx.InitialState.Set(Tag, FactState == EKMGoapFactState::Active);
+			EKMGoapBeliefState FactState = Agent->GetFact(Tag);
+			OutCtx.InitialState.Set(Tag, FactState == EKMGoapBeliefState::Positive);
 		}
 		
 		// Beliefs snapshot
@@ -130,8 +130,8 @@ bool UKMGoapPlanSearch_Dijkstra::BuildContext(
 		Agent->BeliefsByTag.GetKeys(BeliefsTags);
 		for (const FGameplayTag& BeliefsTag : BeliefsTags)
 		{
-			bool bResult = Agent->EvaluateBeliefByTag(BeliefsTag);
-			OutCtx.InitialState.Set(BeliefsTag, bResult);
+			EKMGoapBeliefState Result = Agent->EvaluateBeliefByTag(BeliefsTag);
+			OutCtx.InitialState.Set(BeliefsTag, Result == EKMGoapBeliefState::Positive);
 		}
 	}
 

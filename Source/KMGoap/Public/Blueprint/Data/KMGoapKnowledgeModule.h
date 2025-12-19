@@ -31,6 +31,7 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	TObjectPtr<UKMGoapGoalSet> GoalSet;
 	
-	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	UPROPERTY(EditAnywhere, BlueprintReadOnly,
+		meta=(Tooltip="Empty map means this Module will never deactivate once added"))
 	TMap<FGameplayTag, bool> DeactivationRules;
 };

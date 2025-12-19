@@ -49,8 +49,9 @@ void UKMGoapKnowledgeRuntime::DeactivateKnowledgesWithTags(UKMGoapAgentComponent
 		}
 		
 		KnowledgeSet.Remove(Tag);
-		Agent->ResetExecutionState();
 	}
+	Agent->UpdateBeliefEvaluationCache();
+	Agent->ResetExecutionState();
 }
 
 void UKMGoapKnowledgeRuntime::InitializeModule(UKMGoapAgentComponent* Agent, UKMGoapKnowledgeModule* AddedModule)
@@ -77,6 +78,8 @@ void UKMGoapKnowledgeRuntime::InitializeModule(UKMGoapAgentComponent* Agent, UKM
 	
 	auto TagsGroup = FKMGoapInstancedModuleTags{BeliefTags, ActionTags, GoalsTags};
 	TagGroupPerModule.Add(AddedModule, TagsGroup);
+	Agent->UpdateBeliefEvaluationCache();
+	Agent->ResetExecutionState();
 }
 
 void UKMGoapKnowledgeRuntime::EvaluateKnowledgeModulesDeactivationRules(
@@ -87,11 +90,20 @@ void UKMGoapKnowledgeRuntime::EvaluateKnowledgeModulesDeactivationRules(
 	for (const TTuple<FGameplayTag, UKMGoapKnowledgeModule*>& Set : KnowledgeSet)
 	{
 		UKMGoapKnowledgeModule* Module = Set.Value;
-		bool bShouldRemove = true;
-		for (const TTuple<FGameplayTag, bool>& DeactivationRule : Module->DeactivationRules)
+		const auto& DeactivationRules = Module->DeactivationRules;
+		if (DeactivationRules.IsEmpty())
 		{
-			bool bCurrentValue = Agent->EvaluateBeliefByTag(DeactivationRule.Key);
-			if (bCurrentValue != DeactivationRule.Value)
+			// we do not evaluate deactivation of a module that has no rules
+			// no rules = never deactivate
+			continue;
+		}
+		
+		bool bShouldRemove = true;
+		for (const TTuple<FGameplayTag, bool>& DeactivationRule : DeactivationRules)
+		{
+			EKMGoapBeliefState CurrentValue = Agent->EvaluateBeliefByTag(DeactivationRule.Key);
+			EKMGoapBeliefState ExpectedState = DeactivationRule.Value ? EKMGoapBeliefState::Positive : EKMGoapBeliefState::Negative;
+			if (CurrentValue != ExpectedState)
 			{
 				bShouldRemove = false;
 				break;

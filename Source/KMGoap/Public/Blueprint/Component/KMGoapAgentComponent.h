@@ -69,7 +69,7 @@ public:
 	UKMGoapAgentAction* GetActionByTag(FGameplayTag Tag) const;
 	
 	UFUNCTION(BlueprintCallable, Category="GOAP|Beliefs")
-	bool EvaluateBeliefByTag(FGameplayTag Tag) const;
+	EKMGoapBeliefState EvaluateBeliefByTag(FGameplayTag Tag) const;
 
 	UFUNCTION(BlueprintCallable, Category="GOAP|Beliefs")
 	FVector GetBeliefLocationByTag(FGameplayTag Tag) const;
@@ -78,7 +78,7 @@ public:
 	void SetFact(FGameplayTag FactTag, bool bAdd = true);
 
 	UFUNCTION(BlueprintCallable, Category="GOAP|Facts")
-	EKMGoapFactState GetFact(FGameplayTag Tag) const;
+	EKMGoapBeliefState GetFact(FGameplayTag Tag) const;
 	
 	TArray<FGameplayTag> GetFactsTags() const;
 	
