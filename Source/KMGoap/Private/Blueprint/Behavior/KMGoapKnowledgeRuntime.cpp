@@ -3,12 +3,18 @@
 
 #include "Blueprint/Behavior/KMGoapKnowledgeRuntime.h"
 
+#include "Blueprint/KMGoapAgentAction.h"
+#include "Blueprint/KMGoapAgentBelief.h"
+#include "Blueprint/KMGoapAgentGoal.h"
 #include "Blueprint/Component/KMGoapAgentComponent.h"
+#include "Blueprint/Data/KMGoapActionSet.h"
+#include "Blueprint/Data/KMGoapBeliefSet.h"
+#include "Blueprint/Data/KMGoapGoalSet.h"
 #include "Blueprint/Data/KMGoapKnowledgeModule.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogGoapKnowledgeRuntime, Log, All);
 
-bool UKMGoapKnowledgeRuntime::AddKnowledge(const UKMGoapAgentComponent* Agent, UKMGoapKnowledgeModule* NewModule)
+bool UKMGoapKnowledgeRuntime::AddKnowledge(UKMGoapAgentComponent* Agent, UKMGoapKnowledgeModule* NewModule)
 {
 	if (!NewModule)
 	{
@@ -19,20 +25,58 @@ bool UKMGoapKnowledgeRuntime::AddKnowledge(const UKMGoapAgentComponent* Agent, U
 	{
 		return false;
 	}
-	KnowledgeSet.Add(NewModule->KnowledgeTag, NewModule);
+	UKMGoapKnowledgeModule* AddedModule = KnowledgeSet.Add(NewModule->KnowledgeTag, NewModule);
+	InitializeModule(Agent, AddedModule);
 	Agent->ResetExecutionState();
 	UE_LOG(LogGoapKnowledgeRuntime, Log, TEXT("Added new Module to Runtime. Module name: %s"), *NewModule->GetName());
 	return true;
 }
 
-void UKMGoapKnowledgeRuntime::DeactivateKnowledgesWithTags(const UKMGoapAgentComponent* Agent, const TArray<FGameplayTag>& Tags)
+void UKMGoapKnowledgeRuntime::DeactivateKnowledgesWithTags(UKMGoapAgentComponent* Agent, const TArray<FGameplayTag>& Tags)
 {
 	for (const FGameplayTag& Tag : Tags)
 	{
-		UE_LOG(LogGoapKnowledgeRuntime, Log, TEXT("Deactivating a Module from Runtime. Module name: %s"), *KnowledgeSet[Tag]->GetName());
+		UKMGoapKnowledgeModule* Module = KnowledgeSet[Tag];
+		UE_LOG(LogGoapKnowledgeRuntime, Log,
+			TEXT("Deactivating a Module from Runtime. Module name: %s"),
+			*Module->GetName());
+		
+		{
+			const FKMGoapInstancedModuleTags& TagGroup = TagGroupPerModule[Module];
+			RemoveInstancesByTag(TagGroup.BeliefTags, Agent->BeliefsByTag);
+			RemoveInstancesByTag(TagGroup.ActionTags, Agent->ActionsByTag);
+			RemoveInstancesByTag(TagGroup.GoalTags, Agent->GoalsByTag);
+		}
+		
 		KnowledgeSet.Remove(Tag);
 		Agent->ResetExecutionState();
 	}
+}
+
+void UKMGoapKnowledgeRuntime::InitializeModule(UKMGoapAgentComponent* Agent, UKMGoapKnowledgeModule* AddedModule)
+{
+	auto BeliefTags = AddInstancesFromSet<UKMGoapAgentBelief>(Agent,
+		AddedModule->BeliefSet->Beliefs,
+		Agent->BeliefsByTag,
+		[](const UKMGoapAgentBelief* B) { return B->BeliefTag; }
+		);
+
+	auto ActionTags = AddInstancesFromSet<UKMGoapAgentAction>(
+		Agent,
+		AddedModule->ActionSet->Actions,
+		Agent->ActionsByTag,
+		[](const UKMGoapAgentAction* A) { return A->ActionTag; }
+		);
+
+	auto GoalsTags = AddInstancesFromSet<UKMGoapAgentGoal>(
+		Agent,
+		AddedModule->GoalSet->Goals,
+		Agent->GoalsByTag,
+		[](const UKMGoapAgentGoal* G) { return G->GoalTag; }
+		);
+	
+	auto TagsGroup = FKMGoapInstancedModuleTags{BeliefTags, ActionTags, GoalsTags};
+	TagGroupPerModule.Add(AddedModule, TagsGroup);
 }
 
 void UKMGoapKnowledgeRuntime::EvaluateKnowledgeModulesDeactivationRules(
