@@ -16,9 +16,14 @@ class KMGOAP_API UKMGoapPlannerConfig : public UDataAsset
 	GENERATED_BODY()
 	
 public:
+	UKMGoapPlannerConfig()
+	{
+		SearchAlgorithmClass = UKMGoapPlanSearch_Dijkstra::StaticClass();
+	}
+	
 	// Which algorithm to instantiate at runtime.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="KMGoap|Planning")
-	TSubclassOf<UKMGoapPlanSearchBase> SearchAlgorithmClass = UKMGoapPlanSearch_Dijkstra::StaticClass();
+	TSubclassOf<UKMGoapPlanSearchBase> SearchAlgorithmClass;
 
 	// Optional: default instance tuning (applied after creation).
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="KMGoap|Planning")

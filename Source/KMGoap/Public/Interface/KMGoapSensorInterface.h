@@ -8,7 +8,7 @@
 
 // This class does not need to be modified.
 UINTERFACE(Category = "KMGoap|Interface", BlueprintType)
-class UKMGoapSensorInterface : public UInterface
+class KMGOAP_API UKMGoapSensorInterface : public UInterface
 {
 	GENERATED_BODY()
 };

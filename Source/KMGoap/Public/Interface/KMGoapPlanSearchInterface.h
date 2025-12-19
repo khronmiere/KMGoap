@@ -12,7 +12,7 @@ class UKMGoapAgentAction;
 struct FKMGoapActionPlan;
 
 UINTERFACE(BlueprintType)
-class UKMGoapPlanSearchInterface : public UInterface
+class KMGOAP_API UKMGoapPlanSearchInterface : public UInterface
 {
 	GENERATED_BODY()
 };
