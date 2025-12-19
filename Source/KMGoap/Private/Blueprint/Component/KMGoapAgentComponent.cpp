@@ -7,6 +7,7 @@
 #include "Blueprint/KMGoapAgentAction.h"
 #include "Blueprint/KMGoapAgentBelief.h"
 #include "Blueprint/KMGoapAgentGoal.h"
+#include "Blueprint/Behavior/KMGoapKnowledgeRuntime.h"
 #include "Blueprint/Data/KMGoapActionSet.h"
 #include "Blueprint/Data/KMGoapBeliefSet.h"
 #include "Blueprint/Data/KMGoapGoalSet.h"
@@ -111,6 +112,15 @@ TArray<FGameplayTag> UKMGoapAgentComponent::GetFactsTags() const
 	return Result;
 }
 
+bool UKMGoapAgentComponent::AddNewKnowledgeModule(UKMGoapKnowledgeModule* NewModule)
+{
+	if (!NewModule || !KnowledgeRuntime)
+	{
+		return false;
+	}
+	return KnowledgeRuntime->AddKnowledge(this, NewModule);
+}
+
 void UKMGoapAgentComponent::InitializeStateMachineRunner()
 {
 	UE_LOG(LogGoapAgent, Log, TEXT("Initializing StateMachine Runner"));
@@ -135,6 +145,7 @@ void UKMGoapAgentComponent::BeginPlay()
 	BuildGoals();
 	
 	InitializeStateMachineRunner();
+	InitializeKnowledgeRuntime();
 }
 
 void UKMGoapAgentComponent::StopStateMachineRunner()
@@ -144,6 +155,11 @@ void UKMGoapAgentComponent::StopStateMachineRunner()
 		IKMGoapAgentStateMachineInterface::Execute_Stop(StateMachineRunner);
 		StateMachineRunner = nullptr;
 	}
+}
+
+void UKMGoapAgentComponent::InitializeKnowledgeRuntime()
+{
+	KnowledgeRuntime = NewObject<UKMGoapKnowledgeRuntime>();
 }
 
 void UKMGoapAgentComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -160,6 +176,10 @@ void UKMGoapAgentComponent::TickComponent(float DeltaTime, ELevelTick TickType, 
 	if (StateMachineRunner)
 	{
 		IKMGoapAgentStateMachineInterface::Execute_Tick(StateMachineRunner, DeltaTime);
+	}
+	if (KnowledgeRuntime)
+	{
+		KnowledgeRuntime->Tick(this);
 	}
 }
 
@@ -278,6 +298,14 @@ bool UKMGoapAgentComponent::ComputePlanForGoals(
 	}
 	
 	return IKMGoapPlanSearchInterface::Execute_BuildPlan(Algorithm, this, GoalsToCheck, LastGoal, OutPlan);
+}
+
+void UKMGoapAgentComponent::ResetExecutionState() const
+{
+	if (StateMachineRunner)
+	{
+		IKMGoapAgentStateMachineInterface::Execute_Reset(StateMachineRunner);
+	}
 }
 
 void UKMGoapAgentComponent::BuildBeliefs()

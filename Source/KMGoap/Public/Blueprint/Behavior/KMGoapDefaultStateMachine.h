@@ -23,6 +23,8 @@ public:
 	
 	virtual void Tick_Implementation(float DeltaTime) override;
 	
+	virtual void Reset_Implementation() override;
+	
 	virtual void OnSensorStateUpdate_Implementation() override;
 
 protected:

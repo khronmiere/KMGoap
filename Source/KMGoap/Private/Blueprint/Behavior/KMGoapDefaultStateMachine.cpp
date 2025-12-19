@@ -46,7 +46,6 @@ void UKMGoapDefaultStateMachine::Tick_Implementation(float DeltaTime)
 	
 	if (CurrentAction)
 	{
-		UE_LOG(LogGoapDefaultStateMachine, Log, TEXT("Tick %s"), *CurrentAction->GetName());
 		if (!Agent->ValidateActionPreconditions(CurrentAction))
 		{
 			ResetExecutionState();
@@ -67,9 +66,16 @@ void UKMGoapDefaultStateMachine::Tick_Implementation(float DeltaTime)
 	}
 }
 
+void UKMGoapDefaultStateMachine::Reset_Implementation()
+{
+	ResetExecutionState();
+	UE_LOG(LogGoapDefaultStateMachine, Log, TEXT("Execution Plan Reset executed"));
+}
+
 void UKMGoapDefaultStateMachine::OnSensorStateUpdate_Implementation()
 {
 	ResetExecutionState();
+	UE_LOG(LogGoapDefaultStateMachine, Log, TEXT("Sensor Update received"));
 }
 
 void UKMGoapDefaultStateMachine::CalculatePlan()

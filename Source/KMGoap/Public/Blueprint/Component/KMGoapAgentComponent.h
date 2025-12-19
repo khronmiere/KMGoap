@@ -10,6 +10,8 @@
 #include "Data/KMGoapCondition.h"
 #include "KMGoapAgentComponent.generated.h"
 
+class UKMGoapKnowledgeModule;
+class UKMGoapKnowledgeRuntime;
 struct FKMGoapCondition;
 class UKMGoapAgentAction;
 class UKMGoapBeliefSet;
@@ -79,6 +81,9 @@ public:
 	EKMGoapFactState GetFact(FGameplayTag Tag) const;
 	
 	TArray<FGameplayTag> GetFactsTags() const;
+	
+	UFUNCTION(BlueprintCallable, Category="GOAP|Knowledge")
+	bool AddNewKnowledgeModule(UKMGoapKnowledgeModule* NewModule);
 
 	bool ValidateActionPreconditions(const UKMGoapAgentAction* Action) const;
 	void UpdateBeliefEvaluationCache();
@@ -88,6 +93,8 @@ public:
 		UKMGoapAgentGoal* LastGoal,
 		FKMGoapActionPlan& OutPlan);
 	
+	void ResetExecutionState() const;
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
@@ -103,6 +110,9 @@ private:
 	
 	UPROPERTY(Transient)
 	TMap<FGameplayTag, FKMGoapBeliefCacheEntry> BeliefCache;
+	
+	UPROPERTY(Transient)
+	TObjectPtr<UKMGoapKnowledgeRuntime> KnowledgeRuntime;
 	
 	FTimerHandle BeliefEvaluateTimerHandle;
 	UPROPERTY(EditAnywhere, Category="GOAP|Runtime")
@@ -122,6 +132,8 @@ private:
 	
 	void InitializeStateMachineRunner();
 	void StopStateMachineRunner();
+	
+	void InitializeKnowledgeRuntime();
 	
 	void BindSensorEvents(UActorComponent* Sensor);
 	void UnbindSensorEvents(UActorComponent* Sensor);

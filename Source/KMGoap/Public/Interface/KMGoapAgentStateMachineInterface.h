@@ -34,5 +34,8 @@ public:
 	void Tick(float DeltaTime);
 	
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category="GOAP|StateMachine")
+	void Reset();
+	
+	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category="GOAP|StateMachine")
 	void OnSensorStateUpdate();
 };
