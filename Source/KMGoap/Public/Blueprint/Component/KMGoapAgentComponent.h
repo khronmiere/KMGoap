@@ -30,7 +30,7 @@ struct KMGOAP_API FKMGoapBeliefCacheEntry
 	bool bValue = false;
 };
 
-UCLASS(ClassGroup=(KMGoap), BlueprintType, Blueprintable, meta=(BlueprintSpawnableComponent))
+UCLASS(ClassGroup=(KMGoap), BlueprintType, Blueprintable, Category = "KMGoap|ActorComponents", meta=(BlueprintSpawnableComponent))
 class KMGOAP_API UKMGoapAgentComponent : public UActorComponent
 {
 	GENERATED_BODY()
@@ -99,6 +99,7 @@ protected:
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
+	void TryLearnKnowledge(FGameplayTag SourceTag);
 
 	UFUNCTION(BlueprintNativeEvent, Category="GOAP|Runtime")
 	void OnSensorTargetChanged(FGameplayTag SensorTag);

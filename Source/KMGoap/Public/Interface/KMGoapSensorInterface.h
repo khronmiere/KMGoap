@@ -32,6 +32,9 @@ public:
 	
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category="KMGoap|Sensor")
 	bool HasTarget() const;
+	
+	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category="KMGoap|Sensor")
+	AActor* GetTarget() const;
 
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category="KMGoap|Sensor")
 	FVector GetTargetPosition() const;

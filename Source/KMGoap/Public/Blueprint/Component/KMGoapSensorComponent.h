@@ -57,5 +57,6 @@ protected:
 	virtual void RegisterTargetChangedListener_Implementation(UObject* Listener, FName FunctionName) override;
 	virtual void UnregisterTargetChangedListener_Implementation(UObject* Listener, FName FunctionName) override;
 	virtual bool HasTarget_Implementation() const override;
+	virtual AActor* GetTarget_Implementation() const override;
 	virtual FVector GetTargetPosition_Implementation() const override;
 };

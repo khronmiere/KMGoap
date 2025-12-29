@@ -89,6 +89,16 @@ bool UKMGoapSensorComponent::HasTarget_Implementation() const
 	return TargetActor.IsValid();
 }
 
+AActor* UKMGoapSensorComponent::GetTarget_Implementation() const
+{
+	if (!HasTarget())
+	{
+		return nullptr;
+	}
+	
+	return TargetActor.Get();
+}
+
 FVector UKMGoapSensorComponent::GetTargetPosition_Implementation() const
 {
 	return TargetActor.IsValid() ? TargetActor->GetActorLocation() : FVector::ZeroVector;

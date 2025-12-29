@@ -8,6 +8,7 @@
 #include "Blueprint/KMGoapAgentBelief.h"
 #include "Blueprint/KMGoapAgentGoal.h"
 #include "Blueprint/Behavior/KMGoapKnowledgeRuntime.h"
+#include "Blueprint/Component/KMGoapKnowledgeProviderComponent.h"
 #include "Blueprint/Data/KMGoapActionSet.h"
 #include "Blueprint/Data/KMGoapBeliefSet.h"
 #include "Blueprint/Data/KMGoapGoalSet.h"
@@ -183,9 +184,24 @@ void UKMGoapAgentComponent::TickComponent(float DeltaTime, ELevelTick TickType, 
 	}
 }
 
+void UKMGoapAgentComponent::TryLearnKnowledge(FGameplayTag SourceTag)
+{
+	UActorComponent* Sensor = GetSensorByTag(SourceTag);
+	AActor* Target = IKMGoapSensorInterface::Execute_GetTarget(Sensor);
+	if (!Target)
+	{
+		return;
+	}
+	if (auto KnowledgeProvider = Target->GetComponentByClass<UKMGoapKnowledgeProviderComponent>())
+	{
+		KnowledgeProvider->Teach(this);
+	}
+}
+
 void UKMGoapAgentComponent::HandleSensorTargetChanged(FGameplayTag SourceTag)
 {
 	UE_LOG(LogGoapAgent, Display, TEXT("Target changed, clearing current action and goal."));
+	TryLearnKnowledge(SourceTag);
 	if (StateMachineRunner)
 	{
 		IKMGoapAgentStateMachineInterface::Execute_OnSensorStateUpdate(StateMachineRunner);
