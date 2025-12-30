@@ -1,0 +1,33 @@
+﻿{
+	"FileVersion": 3,
+	"Version": 1,
+	"VersionName": "1.0",
+	"FriendlyName": "KMGoap",
+	"Description": "",
+	"Category": "Other",
+	"CreatedBy": "Rafael Ocariz",
+	"CreatedByURL": "https://www.linkedin.com/in/rafael-ocariz/",
+	"DocsURL": "",
+	"MarketplaceURL": "",
+	"CanContainContent": true,
+	"IsBetaVersion": false,
+	"IsExperimentalVersion": false,
+	"Installed": false,
+	"Modules": [
+		{
+			"Name": "KMGoap",
+			"Type": "Runtime",
+			"LoadingPhase": "Default"
+		},
+		{
+			"Name": "KMGoapEditor",
+			"Type": "Editor",
+			"LoadingPhase": "PostDefault"
+		},
+		{
+			"Name": "KMGoapGraph",
+			"Type": "Editor",
+			"LoadingPhase": "PostDefault"
+		}
+	]
+}
