@@ -51,6 +51,7 @@ protected:
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	
 	// Helper for derived sensors to update state and broadcast once
+	UFUNCTION(BlueprintCallable, Category="Sensor", meta=(BlueprintProtected="true"))
 	void SetTarget(AActor* NewTarget);
 	
 	virtual FGameplayTag GetTag_Implementation() const override;
