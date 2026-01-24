@@ -119,7 +119,11 @@ void UKMGoapDefaultStateMachine::UpdateExecutionState()
 
 void UKMGoapDefaultStateMachine::ResetExecutionState()
 {
-	CurrentAction = nullptr;
+	if (CurrentAction)
+	{
+		CurrentAction->StopAction(Agent);
+		CurrentAction = nullptr;
+	}
 	CurrentGoal = nullptr;
 	CurrentPlan.Reset();
 }
