@@ -48,6 +48,7 @@ void UKMGoapDefaultStateMachine::Tick_Implementation(float DeltaTime)
 	{
 		if (!Agent->ValidateActionPreconditions(CurrentAction))
 		{
+			CurrentAction->StopAction(Agent);
 			ResetExecutionState();
 			return;
 		}
