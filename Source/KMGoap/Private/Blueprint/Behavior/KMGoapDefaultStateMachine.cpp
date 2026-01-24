@@ -48,6 +48,7 @@ void UKMGoapDefaultStateMachine::Tick_Implementation(float DeltaTime)
 	{
 		if (!Agent->ValidateActionPreconditions(CurrentAction))
 		{
+			CurrentAction->StopAction(Agent);
 			ResetExecutionState();
 			return;
 		}
@@ -119,11 +120,7 @@ void UKMGoapDefaultStateMachine::UpdateExecutionState()
 
 void UKMGoapDefaultStateMachine::ResetExecutionState()
 {
-	if (CurrentAction)
-	{
-		CurrentAction->StopAction(Agent);
-		CurrentAction = nullptr;
-	}
+	CurrentAction = nullptr;
 	CurrentGoal = nullptr;
 	CurrentPlan.Reset();
 }
