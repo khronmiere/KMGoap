@@ -27,8 +27,12 @@ void UKMGoapDefaultStateMachine::Tick_Implementation(float DeltaTime)
 	if (!CurrentAction)
 	{
 		UE_LOG(LogGoapDefaultStateMachine, Log, TEXT("No Action, Calculating a new Plan"));
-		CalculatePlan();
-
+		
+		if (!CurrentPlan.IsValid())
+		{
+			CalculatePlan();
+		}
+		
 		if (CurrentPlan.IsValid())
 		{
 			UpdateExecutionState();
@@ -46,13 +50,6 @@ void UKMGoapDefaultStateMachine::Tick_Implementation(float DeltaTime)
 	
 	if (CurrentAction)
 	{
-		if (!Agent->ValidateActionPreconditions(CurrentAction))
-		{
-			CurrentAction->StopAction(Agent);
-			ResetExecutionState();
-			return;
-		}
-		
 		CurrentAction->TickAction(Agent, DeltaTime);
 		if (CurrentAction->IsComplete())
 		{
@@ -121,6 +118,7 @@ void UKMGoapDefaultStateMachine::UpdateExecutionState()
 void UKMGoapDefaultStateMachine::ResetExecutionState()
 {
 	CurrentAction = nullptr;
+
 	CurrentGoal = nullptr;
 	CurrentPlan.Reset();
 }

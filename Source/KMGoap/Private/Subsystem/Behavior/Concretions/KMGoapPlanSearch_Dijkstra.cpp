@@ -35,6 +35,17 @@ namespace
 			return A.GetDynamicCost(Agent) < B.GetDynamicCost(Agent);
 		});
 	}
+	
+	bool IsFact(const UKMGoapAgentComponent* Agent, const FKMGoapCondition& Condition)
+	{
+		if (!Agent || !Condition.Tag.IsValid())
+		{
+			return false;
+		}
+		
+		UKMGoapAgentBelief* Belief = Agent->GetBeliefByTag(Condition.Tag);
+		return Belief == nullptr;
+	}
 
 	bool IsFactKnownSatisfied(const UKMGoapAgentComponent* Agent, const FKMGoapCondition& Condition)
 	{
@@ -46,7 +57,7 @@ namespace
 		const EKMGoapBeliefState FactState = Agent->GetFact(Condition.Tag);
 		const EKMGoapBeliefState Expected = Condition.bValue ? EKMGoapBeliefState::Positive : EKMGoapBeliefState::Negative;
 
-		return FactState == Expected;
+		return FactState != EKMGoapBeliefState::Unknown && FactState == Expected;
 	}
 }
 
@@ -152,12 +163,17 @@ bool UKMGoapPlanSearch_Dijkstra::BuildContext(
 		bool bAnyUnsatisfied = false;
 		for (const FKMGoapCondition& Condition : Goal->DesiredEffects)
 		{
-			bool bValue = false;
-			if (IsFactKnownSatisfied(Agent, Condition))
+			if (IsFact(Agent, Condition))
 			{
-				continue;
+				if (IsFactKnownSatisfied(Agent, Condition))
+				{
+					continue;
+				}
+				bAnyUnsatisfied = true;
+				break;
 			}
-			
+		
+			bool bValue = false;
 			if (OutCtx.InitialState.TryGet(Condition.Tag, bValue))
 			{
 				if (bValue != Condition.bValue)

@@ -34,6 +34,11 @@ bool UKMGoapKnowledgeRuntime::AddKnowledge(UKMGoapAgentComponent* Agent, UKMGoap
 
 void UKMGoapKnowledgeRuntime::DeactivateKnowledgesWithTags(UKMGoapAgentComponent* Agent, const TArray<FGameplayTag>& Tags)
 {
+	if (Tags.IsEmpty())
+	{
+		return;
+	}
+	
 	for (const FGameplayTag& Tag : Tags)
 	{
 		UKMGoapKnowledgeModule* Module = KnowledgeSet[Tag];
