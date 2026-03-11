@@ -91,7 +91,7 @@ bool UKMGoapSensorComponent::HasTarget_Implementation() const
 
 AActor* UKMGoapSensorComponent::GetTarget_Implementation() const
 {
-	if (!HasTarget())
+	if (!Execute_HasTarget(this))
 	{
 		return nullptr;
 	}
