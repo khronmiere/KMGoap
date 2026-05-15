@@ -284,8 +284,8 @@ bool UKMGoapPlanSearch_Dijkstra::SolveGoalDijkstra(
 	int32 ExpandedNodes = 0;
 
 	// The root state is a copy of the planning snapshot. Every explored node owns
-	// its own simulated state so action effects can be applied without mutating the
-	// real agent.
+	// its own simulated state so planner postconditions can be applied without mutating
+	// the real agent.
 	FKMGoapSimState RootState = Context.InitialState;
 
 	if (SatisfiesAll(RootState, Goal->DesiredEffects))
@@ -511,9 +511,9 @@ uint32 UKMGoapPlanSearch_Dijkstra::HashState(const FKMGoapSimState& State)
 	// produce different hashes for equivalent states. Sorting keys first gives each
 	// logical state a deterministic hash input order.
 	TArray<FGameplayTag> Keys;
-	Keys.Reserve(State.Facts.Num());
+	Keys.Reserve(State.Values.Num());
 
-	for (const TTuple<FGameplayTag, bool>& Pair : State.Facts)
+	for (const TTuple<FGameplayTag, bool>& Pair : State.Values)
 	{
 		Keys.Add(Pair.Key);
 	}
@@ -526,12 +526,12 @@ uint32 UKMGoapPlanSearch_Dijkstra::HashState(const FKMGoapSimState& State)
 	uint32 Hash = 0;
 	for (const FGameplayTag& K : Keys)
 	{
-		const bool* V = State.Facts.Find(K);
+		const bool* V = State.Values.Find(K);
 		Hash = HashCombineFast(Hash, GetTypeHash(K));
 		Hash = HashCombineFast(Hash, GetTypeHash(V ? *V : false));
 	}
 
-	Hash = HashCombineFast(Hash, GetTypeHash(State.Facts.Num()));
+	Hash = HashCombineFast(Hash, GetTypeHash(State.Values.Num()));
 	return Hash;
 }
 

@@ -204,7 +204,24 @@ void UKMGoapAgentComponent::TickComponent(float DeltaTime, ELevelTick TickType, 
 void UKMGoapAgentComponent::TryLearnKnowledge(FGameplayTag SourceTag)
 {
 	UActorComponent* Sensor = GetSensorByTag(SourceTag);
-	AActor* Target = IKMGoapSensorInterface::Execute_GetTarget(Sensor);
+	if (!Sensor)
+	{
+		UE_LOG(LogGoapAgent, Error,
+			TEXT("TryLearnKnowledge failed: no sensor found for tag [%s]."),
+			*SourceTag.ToString());
+		return;
+	}
+
+	if (!Sensor->GetClass()->ImplementsInterface(UKMGoapSensorInterface::StaticClass()))
+	{
+		UE_LOG(LogGoapAgent, Error,
+			TEXT("TryLearnKnowledge failed: component [%s] for tag [%s] does not implement KMGoapSensorInterface."),
+			*GetNameSafe(Sensor),
+			*SourceTag.ToString());
+		return;
+	}
+
+	const AActor* Target = IKMGoapSensorInterface::Execute_GetTarget(Sensor);
 	if (!Target)
 	{
 		return;

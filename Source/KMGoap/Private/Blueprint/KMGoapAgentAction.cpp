@@ -35,12 +35,12 @@ EKMGoapActionStatus UKMGoapAgentAction::TickAction(UKMGoapAgentComponent* Agent,
 	check(NewStatus != EKMGoapActionStatus::NotStarted,
 		TEXT("Only Release process can set an Action status to NotStarted"));
 
-	// Only terminal results are committed. Successful actions materialize their promised facts into the
-	// agent's world state, allowing downstream plan steps and replanning to observe the result.
+	// Only terminal results are committed. Successful actions materialize their runtime facts into the
+	// agent's local state, allowing downstream plan steps and replanning to observe the result.
 	Status = NewStatus;
 	if (Status == EKMGoapActionStatus::Succeeded)
 	{
-		ApplyFacts(Agent);
+		ApplyRuntimeFacts(Agent);
 	}
 
 	return Status;
@@ -74,10 +74,11 @@ void UKMGoapAgentAction::Release(UKMGoapAgentComponent* Agent)
 
 TSet<FKMGoapCondition> UKMGoapAgentAction::GetPostConditions() const
 {
-	// Planning considers both declarative effects and facts that will be written on success. This allows
-	// actions to contribute to plan satisfaction even when their runtime fact writes are separate from cost/effect data.
-	TSet<FKMGoapCondition> PostConditions = Effects;
-	PostConditions.Append(Facts);
+	// Planning considers both planner-only predicted effects and runtime fact writes.
+	// Runtime execution only applies RuntimeFacts; PredictedEffects must become true through gameplay,
+	// sensors, or beliefs.
+	TSet<FKMGoapCondition> PostConditions = PredictedEffects;
+	PostConditions.Append(RuntimeFacts);
 	return PostConditions;
 }
 
@@ -91,13 +92,14 @@ EKMGoapActionStatus UKMGoapAgentAction::OnTick_Implementation(UKMGoapAgentCompon
 	return EKMGoapActionStatus::Succeeded;
 }
 
-void UKMGoapAgentAction::ApplyFacts(UKMGoapAgentComponent* Agent) const
+void UKMGoapAgentAction::ApplyRuntimeFacts(UKMGoapAgentComponent* Agent) const
 {
 	if (!Agent) return;
 
-	// Facts are authoritative state changes caused by successful execution, not speculative planner effects.
-	for (const FKMGoapCondition& Fact : Facts)
+	// RuntimeFacts are authoritative agent-local state changes caused by successful execution.
+	// PredictedEffects are not written here because they represent planner-only expected outcomes.
+	for (const FKMGoapCondition& RuntimeFact : RuntimeFacts)
 	{
-		Agent->SetFact(Fact.Tag, Fact.bValue);
+		Agent->SetFact(RuntimeFact.Tag, RuntimeFact.bValue);
 	}
 }

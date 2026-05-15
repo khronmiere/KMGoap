@@ -177,37 +177,3 @@ void UKMGoapKnowledgeRuntime::Tick(UKMGoapAgentComponent* Agent)
 	EvaluateKnowledgeModulesDeactivationRules(Agent, ToRemove);
 	DeactivateKnowledgesWithTags(Agent, ToRemove);
 }
-
-void UKMGoapAgentComponent::TryLearnKnowledge(FGameplayTag SourceTag)
-{
-	UActorComponent* Sensor = GetSensorByTag(SourceTag);
-	if (!Sensor)
-	{
-		UE_LOG(LogGoapKnowledgeRuntime, Warning,
-			TEXT("TryLearnKnowledge failed: no sensor found for tag [%s]."),
-			*SourceTag.ToString());
-		return;
-	}
-
-	if (!Sensor->GetClass()->ImplementsInterface(UKMGoapSensorInterface::StaticClass()))
-	{
-		UE_LOG(LogGoapKnowledgeRuntime, Warning,
-			TEXT("TryLearnKnowledge failed: component [%s] for tag [%s] does not implement KMGoapSensorInterface."),
-			*GetNameSafe(Sensor),
-			*SourceTag.ToString());
-		return;
-	}
-
-	AActor* Target = IKMGoapSensorInterface::Execute_GetTarget(Sensor);
-	if (!Target)
-	{
-		return;
-	}
-
-	// Knowledge discovery is sensor-driven: perceived actors can provide new beliefs,
-	// actions, or goals to the agent at runtime.
-	if (auto KnowledgeProvider = Target->GetComponentByClass<UKMGoapKnowledgeProviderComponent>())
-	{
-		KnowledgeProvider->Teach(this);
-	}
-}

@@ -34,9 +34,12 @@ enum class EKMGoapActionStatus : uint8
  * Defines a single GOAP action that an agent can evaluate, plan with, and execute.
  *
  * A GOAP action represents an executable step in an agent plan. It contains
- * preconditions that must be satisfied before execution, effects that describe
- * the world-state changes produced by the action, and optional runtime facts
- * that may be applied to the owning agent.
+ * preconditions that must be satisfied before execution, predicted effects used by
+ * the planner, and optional runtime facts that are written to the owning agent when
+ * the action succeeds.
+ *
+ * PredictedEffects are simulation-only and are not directly written to the agent.
+ * RuntimeFacts are agent-local state changes and are written on successful execution.
  *
  * Actions are authored as Blueprintable UObject assets and are instanced by
  * an agent at runtime. The agent executor drives the action lifecycle by calling
@@ -67,18 +70,23 @@ public:
 	TSet<FKMGoapCondition> Preconditions;
 
 	/**
-	 * Conditions this action is expected to make true or false after successful completion.
+	 * Planner-only conditions this action is expected to make true or false after successful completion.
+	 *
+	 * These conditions are used when simulating plans, but they are not directly written to the agent's
+	 * runtime fact map. Use these for outcomes that should be observed through gameplay, sensors, or beliefs.
 	 */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Action",
-		meta=(ToolTip="Planner-only expected world/belief outcomes. These are not written to the agent at runtime; they should become true through gameplay/world changes or beliefs."))
-	TSet<FKMGoapCondition> Effects;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Action|Planning",
+		meta=(ToolTip="Planner-only expected world/belief outcomes. These are not written to the agent at runtime; they should become true through gameplay, sensors, or beliefs."))
+	TSet<FKMGoapCondition> PredictedEffects;
 
 	/**
-	 * Agent-local fact values applied by this action during execution.
+	 * Agent-local fact values written when this action succeeds.
+	 *
+	 * Runtime facts are also included as planner postconditions so future simulated actions can depend on them.
 	 */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Action",
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Action|Runtime",
 		meta=(ToolTip="Agent-local fact changes written to the agent when this action succeeds. These also participate in planning as postconditions."))
-	TSet<FKMGoapCondition> Facts;
+	TSet<FKMGoapCondition> RuntimeFacts;
 
 	/**
 	 * Starts this action for the supplied GOAP agent.
@@ -133,9 +141,13 @@ public:
 	void Release(UKMGoapAgentComponent* Agent);
 	
 	/**
-	 * Gets the conditions that should be considered true after this action completes.
+	 * Gets every condition that should be considered true in planner simulation after this action completes.
 	 *
-	 * @return Set of post-conditions produced by this action.
+	 * This includes both PredictedEffects and RuntimeFacts:
+	 * - PredictedEffects describe expected world/belief outcomes for planning only.
+	 * - RuntimeFacts describe agent-local fact writes that are applied on successful execution.
+	 *
+	 * @return Set of planner postconditions produced by this action.
 	 */
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category="Action")
 	TSet<FKMGoapCondition> GetPostConditions() const;
@@ -213,8 +225,12 @@ protected:
 
 	/**
 	 * Applies this action's fact changes to the supplied agent.
+	 * Applies this action's runtime fact changes to the supplied agent.
 	 *
-	 * @param Agent Agent component that receives the fact updates.
+	 * PredictedEffects are intentionally not written here. They are planner-only expectations that should
+	 * become true through gameplay systems, sensors, or evaluated beliefs.
+	 *
+	 * @param Agent Agent component that receives the runtime fact updates.
 	 */
-	void ApplyFacts(UKMGoapAgentComponent* Agent) const;
+	void ApplyRuntimeFacts(UKMGoapAgentComponent* Agent) const;
 };

@@ -111,6 +111,12 @@ void UKMGoapDefaultStateMachine::CalculatePlan()
 	{
 		UKMGoapAgentGoal* Goal = Pair.Value;
 		const float GoalPriority = Goal->GetPriority(Agent);
+		
+		if (!Goal)
+		{
+			UE_LOG(LogGoapDefaultStateMachine, Warning, TEXT("Goal is null. Tag: %s"), *Pair.Key.ToString());
+			continue;
+		}
 
 		if (Goal == CurrentGoal)
 		{
