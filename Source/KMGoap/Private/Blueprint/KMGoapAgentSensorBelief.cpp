@@ -1,6 +1,4 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
-
-
+﻿// All rights reserved by Khrönmière Entertainment.
 #include "Blueprint/KMGoapAgentSensorBelief.h"
 
 #include "Blueprint/Component/KMGoapAgentComponent.h"
@@ -13,6 +11,8 @@ UActorComponent* UKMGoapAgentSensorBelief::GetCachedSensor(const UKMGoapAgentCom
 
 UActorComponent* UKMGoapAgentSensorBelief::ResolveSensor(const UKMGoapAgentComponent* Agent) const
 {
+	// Sensor lookup is cached because beliefs may be evaluated frequently by planning and runtime checks.
+	// The cache is weak so destroyed components do not remain pinned by the belief.
 	if (CachedSensor.IsValid())
 	{
 		return CachedSensor.Get();
@@ -29,12 +29,13 @@ UActorComponent* UKMGoapAgentSensorBelief::ResolveSensor(const UKMGoapAgentCompo
 		return nullptr;
 	}
 
+	// The tag finds a component candidate; the interface check verifies it exposes the sensor contract
+	// this belief depends on.
 	if (!Sensor->GetClass()->ImplementsInterface(UKMGoapSensorInterface::StaticClass()))
 	{
 		return nullptr;
 	}
 
-	// Cache it
 	const_cast<UKMGoapAgentSensorBelief*>(this)->CachedSensor = Sensor;
 	return Sensor;
 }
@@ -50,6 +51,8 @@ FVector UKMGoapAgentSensorBelief::SensorTargetPosition(const UKMGoapAgentCompone
 
 bool UKMGoapAgentSensorBelief::Native_Condition(const UKMGoapAgentComponent* Agent) const
 {
+	// Sensor-backed beliefs are only true candidates when the sensor currently has a target. The base
+	// condition then applies any additional custom filtering supplied by subclasses or Blueprints.
 	if (UActorComponent* Sensor = ResolveSensor(Agent))
 	{
 		if (IKMGoapSensorInterface::Execute_HasTarget(Sensor))
@@ -62,11 +65,15 @@ bool UKMGoapAgentSensorBelief::Native_Condition(const UKMGoapAgentComponent* Age
 
 bool UKMGoapAgentSensorBelief::Condition_Implementation(const UKMGoapAgentComponent* Agent) const
 {
+	// Once a valid sensor target exists, the default sensor belief is satisfied. Override this to add
+	// range checks, team checks, line-of-sight rules, or other domain-specific constraints.
 	return true;
 }
 
 FVector UKMGoapAgentSensorBelief::Native_ObservedLocation(const UKMGoapAgentComponent* Agent) const
 {
+	// Some consumers want the sensor's raw target position, while others want the belief's overridden
+	// observed location. This flag allows the asset to choose without changing calling code.
 	if (bUseRawTargetLocation)
 	{
 		return SensorTargetPosition(Agent);
