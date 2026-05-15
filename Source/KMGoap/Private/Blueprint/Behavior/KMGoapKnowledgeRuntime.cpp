@@ -1,6 +1,4 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
-
-
+﻿// All rights reserved by Khrönmière Entertainment.
 #include "Blueprint/Behavior/KMGoapKnowledgeRuntime.h"
 
 #include "Blueprint/KMGoapAgentAction.h"
@@ -25,9 +23,13 @@ bool UKMGoapKnowledgeRuntime::AddKnowledge(UKMGoapAgentComponent* Agent, UKMGoap
 	{
 		return false;
 	}
+
 	UKMGoapKnowledgeModule* AddedModule = KnowledgeSet.Add(NewModule->KnowledgeTag, NewModule);
 	InitializeModule(Agent, AddedModule);
+
+	// New beliefs/actions/goals may invalidate the currently selected goal or action plan.
 	Agent->ResetExecutionState();
+
 	UE_LOG(LogGoapKnowledgeRuntime, Log, TEXT("Added new Module to Runtime. Module name: %s"), *NewModule->GetName());
 	return true;
 }
@@ -52,9 +54,12 @@ void UKMGoapKnowledgeRuntime::DeactivateKnowledgesWithTags(UKMGoapAgentComponent
 			RemoveInstancesByTag(TagGroup.ActionTags, Agent->ActionsByTag);
 			RemoveInstancesByTag(TagGroup.GoalTags, Agent->GoalsByTag);
 		}
-		
+
 		KnowledgeSet.Remove(Tag);
 	}
+
+	// Removing knowledge can invalidate cached belief results and any plan built from
+	// module-provided actions or goals.
 	Agent->UpdateBeliefEvaluationCache();
 	Agent->ResetExecutionState();
 }
@@ -83,6 +88,9 @@ void UKMGoapKnowledgeRuntime::InitializeModule(UKMGoapAgentComponent* Agent, UKM
 	
 	auto TagsGroup = FKMGoapInstancedModuleTags{BeliefTags, ActionTags, GoalsTags};
 	TagGroupPerModule.Add(AddedModule, TagsGroup);
+
+	// Evaluate immediately so deactivation checks and future planning use a coherent view
+	// of the newly added knowledge.
 	Agent->UpdateBeliefEvaluationCache();
 	Agent->ResetExecutionState();
 }
@@ -98,11 +106,12 @@ void UKMGoapKnowledgeRuntime::EvaluateKnowledgeModulesDeactivationRules(
 		const auto& DeactivationRules = Module->DeactivationRules;
 		if (DeactivationRules.IsEmpty())
 		{
-			// we do not evaluate deactivation of a module that has no rules
-			// no rules = never deactivate
+			// A module without deactivation rules is considered persistent.
 			continue;
 		}
-		
+
+		// Deactivation rules are conjunctive: every configured belief state must match
+		// before the module is removed from the agent.
 		bool bShouldRemove = true;
 		for (const TTuple<FGameplayTag, bool>& DeactivationRule : DeactivationRules)
 		{

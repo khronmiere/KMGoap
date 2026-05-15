@@ -1,4 +1,5 @@
-﻿#include "Subsystem/Behavior/Concretions/KMGoapPlanSearch_Dijkstra.h"
+﻿// All rights reserved by Khrönmière Entertainment.
+#include "Subsystem/Behavior/Concretions/KMGoapPlanSearch_Dijkstra.h"
 
 #include "Blueprint/Component/KMGoapAgentComponent.h"
 #include "Blueprint/KMGoapAgentAction.h"
@@ -16,8 +17,18 @@ DEFINE_LOG_CATEGORY_STATIC(LogGoapDijkstra, Log, All);
 
 namespace
 {
+	/**
+	 * Small priority adjustment used to prefer the most recently selected goal when
+	 * competing goals are otherwise close in priority.
+	 *
+	 * This reduces visual/behavioral thrashing when two goals have nearly identical
+	 * scores, while still allowing clearly higher-priority goals to take over.
+	 */
 	constexpr float RecentGoalBias = 0.01f;
-	
+
+	/**
+	 * Orders candidate goals by runtime priority, with a slight bias toward goal continuity.
+	 */
 	void SortGoals(UKMGoapAgentComponent* Agent, TArray<UKMGoapAgentGoal*>& InOutGoals, UKMGoapAgentGoal* MostRecentGoal)
 	{
 		InOutGoals.Sort([Agent, MostRecentGoal](const UKMGoapAgentGoal& A, const UKMGoapAgentGoal& B)
@@ -28,6 +39,13 @@ namespace
 		});
 	}
 
+	/**
+	 * Gives cheaper actions earlier consideration during graph expansion.
+	 *
+	 * Dijkstra still guarantees least-cost discovery through the heap ordering; this
+	 * pre-sort only improves the shape of exploration when multiple actions are valid
+	 * from the same state.
+	 */
 	void SortActionsByCost(const UKMGoapAgentComponent* Agent, TArray<TObjectPtr<UKMGoapAgentAction>>& InOutActions)
 	{
 		InOutActions.Sort([Agent](const UKMGoapAgentAction& A, const UKMGoapAgentAction& B)
@@ -35,18 +53,30 @@ namespace
 			return A.GetDynamicCost(Agent) < B.GetDynamicCost(Agent);
 		});
 	}
-	
+
+	/**
+	 * Returns true when a condition refers to an agent fact instead of a runtime belief.
+	 *
+	 * Facts are stored directly on the agent and do not have a corresponding belief
+	 * object. Beliefs, by contrast, are evaluated and cached before planning begins.
+	 */
 	bool IsFact(const UKMGoapAgentComponent* Agent, const FKMGoapCondition& Condition)
 	{
 		if (!Agent || !Condition.Tag.IsValid())
 		{
 			return false;
 		}
-		
+
 		UKMGoapAgentBelief* Belief = Agent->GetBeliefByTag(Condition.Tag);
 		return Belief == nullptr;
 	}
 
+	/**
+	 * Checks whether a fact is known and already matches the requested condition.
+	 *
+	 * Unknown facts are treated as not satisfied so that the planner can still search
+	 * for actions capable of establishing them.
+	 */
 	bool IsFactKnownSatisfied(const UKMGoapAgentComponent* Agent, const FKMGoapCondition& Condition)
 	{
 		if (!Agent || !Condition.Tag.IsValid())
@@ -83,7 +113,9 @@ bool UKMGoapPlanSearch_Dijkstra::BuildPlan_Implementation(
 		return false;
 	}
 
-	// Try goals in priority order. First solvable goal wins (matches prior behavior).
+	// Goals are attempted in priority order and the first solvable goal is accepted.
+	// This keeps high-level behavior deterministic: the planner does not compare
+	// total action cost across different goals, only within a single goal search.
 	for (UKMGoapAgentGoal* Goal : GoalsSorted)
 	{
 		if (!Goal)
@@ -116,27 +148,28 @@ bool UKMGoapPlanSearch_Dijkstra::BuildContext(
 		return false;
 	}
 
-	// Ensure cache is fresh at planning time. (Beliefs are read-only during the search.)
+	// Planning operates on a stable snapshot. Beliefs may query world state, so they
+	// are evaluated once up front instead of being queried repeatedly while expanding
+	// simulated action chains.
 	Agent->UpdateBeliefEvaluationCache();
 
 	OutCtx = FKMGoapPlanningContext{};
 	OutCtx.Agent = Agent;
 
-	// 1) Build initial simulated state snapshot:
-	//    - Facts: from agent
-	//    - Beliefs: from cached belief results, treated as snapshot "sensor facts"
+	// Build the initial simulated state from both explicit facts and cached beliefs.
 	//
-	// This is the key to avoid calling agent queries during action chaining.
+	// Facts represent authored or externally controlled agent state.
+	// Beliefs represent sensor-derived state at the moment planning begins.
+	//
+	// Once copied into InitialState, both are treated uniformly by the planner.
 	{
-		// Facts Snapshot
 		auto FactsTags = Agent->GetFactsTags();
 		for (const FGameplayTag& Tag : FactsTags)
 		{
 			EKMGoapBeliefState FactState = Agent->GetFact(Tag);
 			OutCtx.InitialState.Set(Tag, FactState == EKMGoapBeliefState::Positive);
 		}
-		
-		// Beliefs snapshot
+
 		TArray<FGameplayTag> BeliefsTags;
 		Agent->BeliefsByTag.GetKeys(BeliefsTags);
 		for (const FGameplayTag& BeliefsTag : BeliefsTags)
@@ -146,7 +179,9 @@ bool UKMGoapPlanSearch_Dijkstra::BuildContext(
 		}
 	}
 
-	// 2) Filter goals (only those not already satisfied by the INITIAL SNAPSHOT)
+	// Only unsatisfied goals enter the search. A goal that already matches the
+	// initial snapshot would produce an empty plan, which is not useful for action
+	// execution.
 	OutGoalsSorted.Reset();
 	OutGoalsSorted.Reserve(GoalsToCheck.Num());
 	for (UKMGoapAgentGoal* Goal : GoalsToCheck)
@@ -156,10 +191,6 @@ bool UKMGoapPlanSearch_Dijkstra::BuildContext(
 			continue;
 		}
 
-		// If the goal is already satisfied right now, skip it.
-		// Use initial snapshot rules:
-		// - if state has a value, use it
-		// - else fallback to known facts from agent, then belief cache
 		bool bAnyUnsatisfied = false;
 		for (const FKMGoapCondition& Condition : Goal->DesiredEffects)
 		{
@@ -169,10 +200,11 @@ bool UKMGoapPlanSearch_Dijkstra::BuildContext(
 				{
 					continue;
 				}
+
 				bAnyUnsatisfied = true;
 				break;
 			}
-		
+
 			bool bValue = false;
 			if (OutCtx.InitialState.TryGet(Condition.Tag, bValue))
 			{
@@ -197,10 +229,12 @@ bool UKMGoapPlanSearch_Dijkstra::BuildContext(
 
 	SortGoals(Agent, OutGoalsSorted, MostRecentGoal);
 
-	// 3) Collect usable actions once (filtering should stay outside the search loop)
+	// Action filtering is intentionally performed once before search. The search
+	// loop should only reason about simulated state transitions, not about whether
+	// actions exist or can be loaded.
 	OutCtx.Actions.Reset();
 	OutCtx.Actions.Reserve(Agent->ActionsByTag.Num());
-	
+
 	for (const TTuple<FGameplayTag, TObjectPtr<UKMGoapAgentAction>>& Pair : Agent->ActionsByTag)
 	{
 		UKMGoapAgentAction* Action = Pair.Value;
@@ -208,7 +242,7 @@ bool UKMGoapPlanSearch_Dijkstra::BuildContext(
 		{
 			continue;
 		}
-		
+
 		OutCtx.Actions.Add(Action);
 	}
 
@@ -237,10 +271,11 @@ bool UKMGoapPlanSearch_Dijkstra::SolveGoalDijkstra(
 	const double StartSeconds = FPlatformTime::Seconds();
 	int32 ExpandedNodes = 0;
 
-	// Root simulated state is the snapshot.
+	// The root state is a copy of the planning snapshot. Every explored node owns
+	// its own simulated state so action effects can be applied without mutating the
+	// real agent.
 	FKMGoapSimState RootState = Context.InitialState;
 
-	// Early out if already satisfied by snapshot.
 	if (SatisfiesAll(RootState, Goal->DesiredEffects))
 	{
 		return false;
@@ -266,7 +301,7 @@ bool UKMGoapPlanSearch_Dijkstra::SolveGoalDijkstra(
 	{
 		bool operator()(const FHeapItem& A, const FHeapItem& B) const
 		{
-			// min-heap
+			// Unreal's heap helpers use this predicate shape to produce a min-cost queue.
 			return A.Cost > B.Cost;
 		}
 	};
@@ -277,8 +312,15 @@ bool UKMGoapPlanSearch_Dijkstra::SolveGoalDijkstra(
 	TArray<FHeapItem> Open;
 	Open.Heapify(FHeapLess{});
 
-	// Best known cost per state hash (pruning). Hash collisions are possible but rare;
-	// if you want collision-proof, use a canonical key (sorted pairs) instead of uint32.
+	// Tracks the cheapest discovered path to each simulated state.
+	//
+	// This is the core Dijkstra pruning rule: if a state has already been reached
+	// at a lower or equal cost, expanding the more expensive path cannot improve the
+	// final plan.
+	//
+	// StateHash is compact and fast, but not collision-proof. If planning correctness
+	// ever depends on distinguishing extremely similar large states, replace this
+	// with a canonical state key.
 	TMap<uint32, float> BestCostByState;
 	BestCostByState.Reserve(512);
 
@@ -321,7 +363,9 @@ bool UKMGoapPlanSearch_Dijkstra::SolveGoalDijkstra(
 
 		FNode& Current = Nodes[Item.NodeIndex];
 
-		// Skip stale heap entries (a cheaper cost for same state was found after this node was queued).
+		// Heap entries are not updated in place. When a cheaper route to the same
+		// state is discovered, the older queued entry becomes stale and is ignored
+		// when eventually popped.
 		if (const float* Best = BestCostByState.Find(Current.StateHash))
 		{
 			if (Current.Cost > *Best + KINDA_SMALL_NUMBER)
@@ -343,7 +387,9 @@ bool UKMGoapPlanSearch_Dijkstra::SolveGoalDijkstra(
 			continue;
 		}
 
-		// Expand: try all actions whose preconditions are satisfied in this simulated state.
+		// Expand from the current simulated state by applying every action whose
+		// preconditions already hold. Preconditions are not re-evaluated against the
+		// world; only the simulated state matters from this point forward.
 		for (UKMGoapAgentAction* Action : Context.Actions)
 		{
 			if (!Action)
@@ -356,7 +402,6 @@ bool UKMGoapPlanSearch_Dijkstra::SolveGoalDijkstra(
 				continue;
 			}
 
-			// Next state = current state + postconditions (simulate action completion)
 			FKMGoapSimState NextState = Current.State;
 			ApplyPostconditions(NextState, Action->GetPostConditions());
 
@@ -390,7 +435,9 @@ bool UKMGoapPlanSearch_Dijkstra::SolveGoalDijkstra(
 		return false;
 	}
 
-	// Reconstruct action chain
+	// Nodes store parent links instead of full paths to keep expansion cheaper.
+	// Once a solution is found, walk backward from the solution node and reverse the
+	// collected actions into execution order.
 	TArray<TObjectPtr<UKMGoapAgentAction>> ReverseActions;
 	ReverseActions.Reserve(16);
 
@@ -431,23 +478,26 @@ bool UKMGoapPlanSearch_Dijkstra::SatisfiesAll(const FKMGoapSimState& State, cons
 		bool Value = false;
 		if (!State.TryGet(Condition.Tag, Value))
 		{
-			// Unknown in simulation => not satisfied.
+			// Unknown simulated values are not assumed to be false; they are simply
+			// unavailable. Requiring explicit state prevents plans from relying on
+			// information that no action or sensor has established.
 			return false;
 		}
+
 		if (Value != Condition.bValue)
 		{
 			return false;
 		}
 	}
+
 	return true;
 }
 
 uint32 UKMGoapPlanSearch_Dijkstra::HashState(const FKMGoapSimState& State)
 {
-	// Canonical hashing:
-	// 1) Copy keys
-	// 2) Sort by tag name (stable)
-	// 3) Hash pairs (tag + bool)
+	// TMap iteration order is not stable, so hashing directly over map pairs would
+	// produce different hashes for equivalent states. Sorting keys first gives each
+	// logical state a deterministic hash input order.
 	TArray<FGameplayTag> Keys;
 	Keys.Reserve(State.Facts.Num());
 

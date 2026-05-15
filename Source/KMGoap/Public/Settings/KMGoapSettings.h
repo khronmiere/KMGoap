@@ -1,5 +1,4 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
-
+﻿// All rights reserved by Khrönmière Entertainment.
 #pragma once
 
 #include "CoreMinimal.h"
@@ -7,13 +6,21 @@
 #include "Engine/DeveloperSettings.h"
 #include "KMGoapSettings.generated.h"
 
+/**
+ * Project-wide developer settings for the KMGoap plugin.
+ *
+ * These settings are stored in the game configuration and expose default GOAP
+ * configuration assets used by runtime systems such as the planner subsystem.
+ */
 UCLASS(Config=Game, DefaultConfig, meta=(DisplayName="KMGoap"))
 class KMGOAP_API UKMGoapSettings : public UDeveloperSettings
 {
 	GENERATED_BODY()
 
 public:
-	// Path to a planner config asset.
+	/**
+	 * Soft reference to the planner configuration asset used by the GOAP planner.
+	 */
 	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Planning",
 		meta=(AllowedClasses="/Script/KMGoap.KMGoapPlannerConfig"))
 	TSoftObjectPtr<UKMGoapPlannerConfig> PlannerConfig;

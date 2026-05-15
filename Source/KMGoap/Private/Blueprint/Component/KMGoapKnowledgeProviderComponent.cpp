@@ -1,6 +1,4 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
-
-
+﻿// All rights reserved by Khrönmière Entertainment.
 #include "Blueprint/Component/KMGoapKnowledgeProviderComponent.h"
 
 #include "Blueprint/Component/KMGoapAgentComponent.h"
@@ -10,11 +8,9 @@ DEFINE_LOG_CATEGORY_STATIC(LogGoapKnowledgeProvider, Log, All);
 // Sets default values for this component's properties
 UKMGoapKnowledgeProviderComponent::UKMGoapKnowledgeProviderComponent()
 {
-	// Set this component to be initialized when the game starts, and to be ticked every frame.  You can turn these features
-	// off to improve performance if you don't need them.
+	// Knowledge providers are passive. They only react when an agent explicitly
+	// requests knowledge, so ticking would add cost without changing behavior.
 	PrimaryComponentTick.bCanEverTick = false;
-
-	// ...
 }
 
 void UKMGoapKnowledgeProviderComponent::Teach(UKMGoapAgentComponent* Agent)
@@ -24,22 +20,28 @@ void UKMGoapKnowledgeProviderComponent::Teach(UKMGoapAgentComponent* Agent)
 		UE_LOG(LogGoapKnowledgeProvider, Error, TEXT("No Agent provided to teach"))
 		return;
 	}
-	
+
+	// Each provider teaches a given agent only once. The agent's knowledge runtime
+	// handles duplicate modules by tag, but this avoids repeated work and keeps the
+	// provider's interaction semantics explicit.
 	if (AgentsThatLearned.Contains(Agent))
 	{
 		return;
 	}
-	
+
 	for (const TObjectPtr<UKMGoapKnowledgeModule>& KnowledgeModule : ModulesToProvide)
 	{
 		Agent->AddNewKnowledgeModule(KnowledgeModule);
 	}
-	
+
 	AgentsThatLearned.Add(Agent);
 }
 
 void UKMGoapKnowledgeProviderComponent::BeginPlay()
 {
 	Super::BeginPlay();
+
+	// Learned-agent state is runtime-only. Reset it on BeginPlay so editor reruns,
+	// respawns, or reinstanced components do not retain stale teaching history.
 	AgentsThatLearned.Reset();
 }
