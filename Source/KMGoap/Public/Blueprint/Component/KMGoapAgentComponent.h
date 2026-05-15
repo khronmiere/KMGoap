@@ -8,9 +8,9 @@
 #include "Data/KMGoapCondition.h"
 #include "KMGoapAgentComponent.generated.h"
 
+struct FKMGoapCondition;
 class UKMGoapKnowledgeModule;
 class UKMGoapKnowledgeRuntime;
-struct FKMGoapCondition;
 class UKMGoapAgentAction;
 class UKMGoapBeliefSet;
 class UKMGoapAgentGoal;
