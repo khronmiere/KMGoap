@@ -12,7 +12,7 @@ void UKMGoapDefaultStateMachine::Start_Implementation(UKMGoapAgentComponent* New
 	Agent = NewAgent;
 
 	// Start from a clean runtime state so reused state machine instances never inherit a stale plan.
-	ResetExecutionState();
+	ResetExecutionState(true);
 
 	UE_LOG(LogGoapDefaultStateMachine, Log, TEXT("State Machine Started"));
 }
@@ -21,7 +21,7 @@ void UKMGoapDefaultStateMachine::Stop_Implementation()
 {
 	// Stop does not clear the assigned agent. The object may be restarted for the same agent later,
 	// but any in-flight action/plan must be discarded.
-	ResetExecutionState();
+	ResetExecutionState(true);
 
 	UE_LOG(LogGoapDefaultStateMachine, Log, TEXT("State Machine Stopped"));
 }
@@ -53,8 +53,7 @@ void UKMGoapDefaultStateMachine::Tick_Implementation(float DeltaTime)
 			{
 				UE_LOG(LogGoapDefaultStateMachine, Log, TEXT("Preconditions not met. Clearing current action/goal."));
 				// Stop the action before clearing it
-				CurrentAction->StopAction(Agent);
-				ResetExecutionState();
+				ResetExecutionState(true);
 			}
 		}
 		
@@ -68,15 +67,14 @@ void UKMGoapDefaultStateMachine::Tick_Implementation(float DeltaTime)
 
 		if (CurrentAction->IsComplete())
 		{
-			CurrentAction->StopAction(Agent);
-			CurrentAction = nullptr;
+			AbortCurrentAction();
 
 			// An exhausted plan means the selected goal was fully serviced. Preserve it as LastGoal
 			// so the planner can use continuity/anti-thrashing rules on the next search.
 			if (!CurrentPlan.IsValid())
 			{
 				LastGoal = CurrentGoal;
-				ResetExecutionState();
+				ResetExecutionState(false);
 			}
 		}
 	}
@@ -84,7 +82,7 @@ void UKMGoapDefaultStateMachine::Tick_Implementation(float DeltaTime)
 
 void UKMGoapDefaultStateMachine::Reset_Implementation()
 {
-	ResetExecutionState();
+	ResetExecutionState(true);
 	UE_LOG(LogGoapDefaultStateMachine, Log, TEXT("Execution Plan Reset executed"));
 }
 
@@ -92,7 +90,7 @@ void UKMGoapDefaultStateMachine::OnSensorStateUpdate_Implementation()
 {
 	// Sensor changes can invalidate both the selected goal and any action preconditions.
 	// Replanning from scratch is safer than trying to patch the existing sequence.
-	ResetExecutionState();
+	ResetExecutionState(true);
 
 	UE_LOG(LogGoapDefaultStateMachine, Log, TEXT("Sensor Update received"));
 }
@@ -112,13 +110,22 @@ void UKMGoapDefaultStateMachine::CalculatePlan()
 	for (auto& Pair : GoalsByTag)
 	{
 		UKMGoapAgentGoal* Goal = Pair.Value;
-		if (!Goal || Goal == CurrentGoal) continue;
-
 		const float GoalPriority = Goal->GetPriority(Agent);
 
-		// Keep the current goal unless another goal has strictly higher priority.
-		// This avoids unnecessary goal churn when priorities are equal.
-		if (!CurrentGoal || GoalPriority > CurrentPriority)
+		if (Goal == CurrentGoal)
+		{
+			if (!bIncludeCurrentGoalWhenReplanning)
+			{
+				continue;
+			}
+			
+			GoalsToCheck.Add(Goal);
+			continue;
+		}
+		
+		const float PriorityDelta = GoalPriority - CurrentPriority;
+		if (PriorityDelta > GoalSwitchPriorityMargin ||
+			(bAllowEqualPriorityGoalSwitching && FMath::IsNearlyZero(PriorityDelta)))
 		{
 			GoalsToCheck.Add(Goal);
 		}
@@ -144,10 +151,30 @@ void UKMGoapDefaultStateMachine::UpdateExecutionState()
 	CurrentPlan.Actions.RemoveAt(0);
 }
 
-void UKMGoapDefaultStateMachine::ResetExecutionState()
+void UKMGoapDefaultStateMachine::AbortCurrentAction()
 {
+	if (!CurrentAction)
+	{
+		return;
+	}
+	
+	CurrentAction->StopAction(Agent);
 	CurrentAction->Release(Agent);
 	CurrentAction = nullptr;
+}
+
+void UKMGoapDefaultStateMachine::ResetExecutionState(bool bStopActiveAction)
+{
+	if (bStopActiveAction)
+	{
+		AbortCurrentAction();
+	}
+	else if (CurrentAction)
+	{
+		CurrentAction->Release(Agent);
+		CurrentAction = nullptr;
+	}
+
 	CurrentGoal = nullptr;
 	CurrentPlan.Reset();
 }

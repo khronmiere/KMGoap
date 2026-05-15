@@ -48,6 +48,12 @@ EKMGoapActionStatus UKMGoapAgentAction::TickAction(UKMGoapAgentComponent* Agent,
 
 void UKMGoapAgentAction::StopAction(UKMGoapAgentComponent* Agent)
 {
+	// No need to stop if action is not started
+	if (Status == EKMGoapActionStatus::NotStarted)
+	{
+		return;
+	}
+	
 	// A stopped action that has not already succeeded is treated as failed so interruption cannot be
 	// mistaken for completion by the planner or external observers.
 	if (Status != EKMGoapActionStatus::Succeeded)

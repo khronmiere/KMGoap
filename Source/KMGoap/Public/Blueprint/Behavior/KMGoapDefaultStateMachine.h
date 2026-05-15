@@ -18,7 +18,7 @@ UCLASS()
 class KMGOAP_API UKMGoapDefaultStateMachine : public UObject, public IKMGoapAgentStateMachineInterface
 {
 	GENERATED_BODY()
-	
+
 public:
 	/**
 	 * Starts the state machine for the supplied GOAP agent.
@@ -71,6 +71,18 @@ protected:
 	/** Current generated action plan for the selected goal. */
 	UPROPERTY(BlueprintReadOnly, Category="GOAP|Runtime")
 	FKMGoapActionPlan CurrentPlan;
+
+	/** Should include the current goal in replanning when it is still valid. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="GOAP|Planning")
+	bool bIncludeCurrentGoalWhenReplanning = true;
+
+	/** Allow switching to goals with equal priority, within a margin. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="GOAP|Planning")
+	bool bAllowEqualPriorityGoalSwitching = true;
+
+	/** Margin for goal priority comparison when allowing equal priority switching. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="GOAP|Planning")
+	float GoalSwitchPriorityMargin = 0.0f;
 	
 	/**
 	 * Calculates a new action plan for the agent's available goals.
@@ -81,9 +93,16 @@ protected:
 	 * Updates action execution state, including action transitions and completion handling.
 	 */
 	void UpdateExecutionState();
+	
+	/**
+	 * Stops the currently active action, if any.
+	 */
+	void AbortCurrentAction();
 
 	/**
 	 * Clears current action, goal, and plan runtime state.
+	 * 
+	 * @param bStopActiveAction If true, the currently active action will be stopped before resetting state.
 	 */
-	void ResetExecutionState();
+	void ResetExecutionState(bool bStopActiveAction);
 };

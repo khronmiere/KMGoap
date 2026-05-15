@@ -69,13 +69,15 @@ public:
 	/**
 	 * Conditions this action is expected to make true or false after successful completion.
 	 */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Action")
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Action",
+		meta=(ToolTip="Planner-only expected world/belief outcomes. These are not written to the agent at runtime; they should become true through gameplay/world changes or beliefs."))
 	TSet<FKMGoapCondition> Effects;
 
 	/**
 	 * Agent-local fact values applied by this action during execution.
 	 */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Action")
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Action",
+		meta=(ToolTip="Agent-local fact changes written to the agent when this action succeeds. These also participate in planning as postconditions."))
 	TSet<FKMGoapCondition> Facts;
 
 	/**
