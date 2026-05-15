@@ -80,7 +80,7 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="GOAP|Planning")
 	bool bAllowEqualPriorityGoalSwitching = true;
 
-	/** Margin for goal priority comparison when allowing equal priority switching. */
+	/** Minimum priority advantage required for another goal to replace the current goal. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="GOAP|Planning")
 	float GoalSwitchPriorityMargin = 0.0f;
 	

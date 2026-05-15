@@ -1,6 +1,5 @@
 ﻿// All rights reserved by Khrönmière Entertainment.
 #include "Blueprint/Behavior/KMGoapDefaultStateMachine.h"
-
 #include "Blueprint/KMGoapAgentAction.h"
 #include "Blueprint/KMGoapAgentGoal.h"
 #include "Blueprint/Component/KMGoapAgentComponent.h"
@@ -129,7 +128,110 @@ void UKMGoapDefaultStateMachine::ResetExecutionState(bool bInterruptActiveAction
 	{
 		ReleaseSelectedAction();
 	}
-
+	
 	CurrentGoal = nullptr;
 	CurrentPlan.Reset();
+}
+
+void UKMGoapDefaultStateMachine::Reset_Implementation()
+{
+	ResetExecutionState(true);
+	UE_LOG(LogGoapDefaultStateMachine, Log, TEXT("Execution Plan Reset executed"));
+}
+
+void UKMGoapDefaultStateMachine::OnSensorStateUpdate_Implementation()
+{
+	// Sensor changes can invalidate both the selected goal and any action preconditions.
+	// Replanning from scratch is safer than trying to patch the existing sequence.
+	ResetExecutionState(true);
+
+	UE_LOG(LogGoapDefaultStateMachine, Log, TEXT("Sensor Update received"));
+}
+
+void UKMGoapDefaultStateMachine::CalculatePlan()
+{
+	if (!Agent)
+	{
+		UE_LOG(LogGoapDefaultStateMachine, Warning, TEXT("CalculatePlan failed: Agent is null."));
+		return;
+	}
+
+	float CurrentPriority = 0.f;
+	if (CurrentGoal)
+	{
+		CurrentPriority = CurrentGoal->GetPriority(Agent);
+	}
+
+	const TMap<FGameplayTag, TObjectPtr<UKMGoapAgentGoal>>& GoalsByTag = Agent->GoalsByTag;
+	TArray<UKMGoapAgentGoal*> GoalsToCheck;
+	GoalsToCheck.Reserve(GoalsByTag.Num());
+
+	for (const TTuple<FGameplayTag, TObjectPtr<UKMGoapAgentGoal>>& Pair : GoalsByTag)
+	{
+		UKMGoapAgentGoal* Goal = Pair.Value;
+		if (!Goal)
+		{
+			continue;
+		}
+
+		// If there is no active goal, let the planner evaluate every valid goal.
+		// The planner will sort/filter by priority and satisfaction state.
+		if (!CurrentGoal)
+		{
+			GoalsToCheck.Add(Goal);
+			continue;
+		}
+
+		const float GoalPriority = Goal->GetPriority(Agent);
+
+		if (Goal == CurrentGoal)
+		{
+			if (bIncludeCurrentGoalWhenReplanning)
+			{
+				GoalsToCheck.Add(Goal);
+			}
+
+			continue;
+		}
+
+		const float PriorityDelta = GoalPriority - CurrentPriority;
+		if (PriorityDelta > GoalSwitchPriorityMargin ||
+			(bAllowEqualPriorityGoalSwitching && FMath::IsNearlyZero(PriorityDelta)))
+		{
+			GoalsToCheck.Add(Goal);
+		}
+	}
+
+	if (GoalsToCheck.IsEmpty())
+	{
+		UE_LOG(LogGoapDefaultStateMachine, Verbose, TEXT("CalculatePlan: no candidate goals to evaluate."));
+		return;
+	}
+
+	FKMGoapActionPlan NewPlan;
+
+	// The planner receives LastGoal as context so search implementations can bias against
+	// oscillating between recently completed goals if they choose to.
+	if (Agent->ComputePlanForGoals(GoalsToCheck, LastGoal, NewPlan) && NewPlan.IsValid())
+	{
+		CurrentPlan = MoveTemp(NewPlan);
+		return;
+	}
+	
+	UE_LOG(LogGoapDefaultStateMachine, Verbose, TEXT("CalculatePlan: no valid plan found."));
+}
+
+void UKMGoapDefaultStateMachine::UpdateExecutionState()
+{
+	if (!CurrentPlan.IsValid())
+	{
+		return;
+	}
+
+	CurrentGoal = CurrentPlan.Goal;
+
+	// Plans are consumed from the front. The state machine owns only the active action at any time;
+	// the remaining actions stay queued in CurrentPlan.
+	CurrentAction = CurrentPlan.Actions[0];
+	CurrentPlan.Actions.RemoveAt(0);
 }
