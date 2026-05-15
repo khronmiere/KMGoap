@@ -1,6 +1,5 @@
 ﻿// All rights reserved by Khrönmière Entertainment.
 #include "Blueprint/KMGoapAgentAction.h"
-
 #include "Blueprint/Component/KMGoapAgentComponent.h"
 
 void UKMGoapAgentAction::StartAction(UKMGoapAgentComponent* Agent)
@@ -14,16 +13,27 @@ void UKMGoapAgentAction::StartAction(UKMGoapAgentComponent* Agent)
 EKMGoapActionStatus UKMGoapAgentAction::TickAction(UKMGoapAgentComponent* Agent, float DeltaTime)
 {
 	// Keep completed, failed, or otherwise unavailable actions stable until the state machine releases them.
-	if (Status != EKMGoapActionStatus::Running || !CanPerform(Agent))
+	if (Status != EKMGoapActionStatus::Running)
 	{
 		return Status;
 	}
 	
+	// If the action cannot be performed, fail immediately
+	if (!CanPerform(Agent))
+	{
+		Status = EKMGoapActionStatus::Failed;
+		return Status;
+	}
+	
 	const EKMGoapActionStatus NewStatus = OnTick(Agent, DeltaTime);
-	if (NewStatus == EKMGoapActionStatus::Running || NewStatus == EKMGoapActionStatus::NotStarted)
+	if (NewStatus == EKMGoapActionStatus::Running)
 	{
 		return Status;
 	}
+	
+	// Guarantee we are not trying to set an invalid status
+	check(NewStatus != EKMGoapActionStatus::NotStarted,
+		TEXT("Only Release process can set an Action status to NotStarted"));
 
 	// Only terminal results are committed. Successful actions materialize their promised facts into the
 	// agent's world state, allowing downstream plan steps and replanning to observe the result.

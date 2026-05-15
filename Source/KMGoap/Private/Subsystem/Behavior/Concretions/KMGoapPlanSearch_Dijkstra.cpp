@@ -167,7 +167,10 @@ bool UKMGoapPlanSearch_Dijkstra::BuildContext(
 		for (const FGameplayTag& Tag : FactsTags)
 		{
 			EKMGoapBeliefState FactState = Agent->GetFact(Tag);
-			OutCtx.InitialState.Set(Tag, FactState == EKMGoapBeliefState::Positive);
+			if (FactState != EKMGoapBeliefState::Unknown)
+			{
+				OutCtx.InitialState.Set(Tag, FactState == EKMGoapBeliefState::Positive);
+			}
 		}
 
 		TArray<FGameplayTag> BeliefsTags;
@@ -175,7 +178,10 @@ bool UKMGoapPlanSearch_Dijkstra::BuildContext(
 		for (const FGameplayTag& BeliefsTag : BeliefsTags)
 		{
 			EKMGoapBeliefState Result = Agent->EvaluateBeliefByTag(BeliefsTag);
-			OutCtx.InitialState.Set(BeliefsTag, Result == EKMGoapBeliefState::Positive);
+			if (Result != EKMGoapBeliefState::Unknown)
+			{
+				OutCtx.InitialState.Set(BeliefsTag, Result == EKMGoapBeliefState::Positive);
+			}
 		}
 	}
 
@@ -206,13 +212,19 @@ bool UKMGoapPlanSearch_Dijkstra::BuildContext(
 			}
 
 			bool bValue = false;
-			if (OutCtx.InitialState.TryGet(Condition.Tag, bValue))
+			if (!OutCtx.InitialState.TryGet(Condition.Tag, bValue))
 			{
-				if (bValue != Condition.bValue)
-				{
-					bAnyUnsatisfied = true;
-					break;
-				}
+				// Unknown belief-backed conditions are not satisfied. This matches
+				// SatisfiesAll(), which requires every condition to be explicitly present
+				// in the simulated state before it can be considered satisfied.
+				bAnyUnsatisfied = true;
+				break;
+			}
+
+			if (bValue != Condition.bValue)
+			{
+				bAnyUnsatisfied = true;
+				break;
 			}
 		}
 

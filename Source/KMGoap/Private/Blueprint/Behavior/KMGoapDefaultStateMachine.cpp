@@ -54,8 +54,12 @@ void UKMGoapDefaultStateMachine::Tick_Implementation(float DeltaTime)
 				UE_LOG(LogGoapDefaultStateMachine, Log, TEXT("Preconditions not met. Clearing current action/goal."));
 				// Stop the action before clearing it
 				CurrentAction->StopAction(Agent);
+				ResetExecutionState();
 			}
 		}
+		
+		// Prevent running initialization and ticking in the same frame
+		return;
 	}
 
 	if (CurrentAction)

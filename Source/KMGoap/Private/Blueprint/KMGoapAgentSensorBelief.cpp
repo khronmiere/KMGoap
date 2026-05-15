@@ -36,7 +36,7 @@ UActorComponent* UKMGoapAgentSensorBelief::ResolveSensor(const UKMGoapAgentCompo
 		return nullptr;
 	}
 
-	const_cast<UKMGoapAgentSensorBelief*>(this)->CachedSensor = Sensor;
+	CachedSensor = Sensor;
 	return Sensor;
 }
 

@@ -37,7 +37,7 @@ protected:
 	 * Runtime weak reference to the resolved sensor component.
 	 */
 	UPROPERTY(Transient)
-	TWeakObjectPtr<UActorComponent> CachedSensor;
+	mutable TWeakObjectPtr<UActorComponent> CachedSensor;
 	
 	/**
 	 * When true, the belief location is read directly from the sensor target position.
