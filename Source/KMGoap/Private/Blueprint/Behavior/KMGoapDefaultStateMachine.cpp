@@ -52,8 +52,8 @@ void UKMGoapDefaultStateMachine::Tick_Implementation(float DeltaTime)
 			else
 			{
 				UE_LOG(LogGoapDefaultStateMachine, Log, TEXT("Preconditions not met. Clearing current action/goal."));
-				// Stop the action before clearing it
-				ResetExecutionState(true);
+				ReleaseSelectedAction();
+				ResetExecutionState(false);
 			}
 		}
 		
@@ -67,7 +67,7 @@ void UKMGoapDefaultStateMachine::Tick_Implementation(float DeltaTime)
 
 		if (CurrentAction->IsComplete())
 		{
-			AbortCurrentAction();
+			FinishCurrentAction();
 
 			// An exhausted plan means the selected goal was fully serviced. Preserve it as LastGoal
 			// so the planner can use continuity/anti-thrashing rules on the next search.
@@ -80,105 +80,54 @@ void UKMGoapDefaultStateMachine::Tick_Implementation(float DeltaTime)
 	}
 }
 
-void UKMGoapDefaultStateMachine::Reset_Implementation()
-{
-	ResetExecutionState(true);
-	UE_LOG(LogGoapDefaultStateMachine, Log, TEXT("Execution Plan Reset executed"));
-}
-
-void UKMGoapDefaultStateMachine::OnSensorStateUpdate_Implementation()
-{
-	// Sensor changes can invalidate both the selected goal and any action preconditions.
-	// Replanning from scratch is safer than trying to patch the existing sequence.
-	ResetExecutionState(true);
-
-	UE_LOG(LogGoapDefaultStateMachine, Log, TEXT("Sensor Update received"));
-}
-
-void UKMGoapDefaultStateMachine::CalculatePlan()
-{
-	float CurrentPriority = 0.f;
-	if (CurrentGoal)
-	{
-		CurrentPriority = CurrentGoal->GetPriority(Agent);
-	}
-
-	const TMap<FGameplayTag, TObjectPtr<UKMGoapAgentGoal>>& GoalsByTag = Agent->GoalsByTag;
-	TArray<UKMGoapAgentGoal*> GoalsToCheck;
-	GoalsToCheck.Reserve(GoalsByTag.Num());
-
-	for (auto& Pair : GoalsByTag)
-	{
-		UKMGoapAgentGoal* Goal = Pair.Value;
-		const float GoalPriority = Goal->GetPriority(Agent);
-		
-		if (!Goal)
-		{
-			UE_LOG(LogGoapDefaultStateMachine, Warning, TEXT("Goal is null. Tag: %s"), *Pair.Key.ToString());
-			continue;
-		}
-
-		if (Goal == CurrentGoal)
-		{
-			if (!bIncludeCurrentGoalWhenReplanning)
-			{
-				continue;
-			}
-			
-			GoalsToCheck.Add(Goal);
-			continue;
-		}
-		
-		const float PriorityDelta = GoalPriority - CurrentPriority;
-		if (PriorityDelta > GoalSwitchPriorityMargin ||
-			(bAllowEqualPriorityGoalSwitching && FMath::IsNearlyZero(PriorityDelta)))
-		{
-			GoalsToCheck.Add(Goal);
-		}
-	}
-
-	FKMGoapActionPlan NewPlan;
-
-	// The planner receives LastGoal as context so search implementations can bias against
-	// oscillating between recently completed goals if they choose to.
-	if (Agent->ComputePlanForGoals(GoalsToCheck, LastGoal, NewPlan) && NewPlan.IsValid())
-	{
-		CurrentPlan = MoveTemp(NewPlan);
-	}
-}
-
-void UKMGoapDefaultStateMachine::UpdateExecutionState()
-{
-	CurrentGoal = CurrentPlan.Goal;
-
-	// Plans are consumed from the front. The state machine owns only the active action at any time;
-	// the remaining actions stay queued in CurrentPlan.
-	CurrentAction = CurrentPlan.Actions[0];
-	CurrentPlan.Actions.RemoveAt(0);
-}
-
-void UKMGoapDefaultStateMachine::AbortCurrentAction()
+void UKMGoapDefaultStateMachine::FinishCurrentAction()
 {
 	if (!CurrentAction)
 	{
 		return;
 	}
-	
+
 	CurrentAction->StopAction(Agent);
 	CurrentAction->Release(Agent);
 	CurrentAction = nullptr;
 }
 
-void UKMGoapDefaultStateMachine::ResetExecutionState(bool bStopActiveAction)
+void UKMGoapDefaultStateMachine::InterruptCurrentAction()
 {
-	if (bStopActiveAction)
+	if (!CurrentAction)
 	{
-		AbortCurrentAction();
+		return;
 	}
-	else if (CurrentAction)
+
+	if (CurrentAction->GetStatus() == EKMGoapActionStatus::Running)
 	{
-		CurrentAction->Release(Agent);
-		CurrentAction = nullptr;
+		CurrentAction->StopAction(Agent);
+	}
+
+	CurrentAction->Release(Agent);
+	CurrentAction = nullptr;
+}
+
+void UKMGoapDefaultStateMachine::ReleaseSelectedAction()
+{
+	if (!CurrentAction)
+	{
+		return;
+	}
+
+	CurrentAction->Release(Agent);
+	CurrentAction = nullptr;
+}
+
+void UKMGoapDefaultStateMachine::ResetExecutionState(bool bInterruptActiveAction)
+{
+	if (bInterruptActiveAction)
+	{
+		InterruptCurrentAction();
+	}
+	else
+	{
+		ReleaseSelectedAction();
 	}
 
 	CurrentGoal = nullptr;

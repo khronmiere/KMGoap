@@ -95,14 +95,32 @@ protected:
 	void UpdateExecutionState();
 	
 	/**
-	 * Stops the currently active action, if any.
+	 * Completes lifecycle cleanup for an action that reached a terminal state naturally.
+	 *
+	 * This calls StopAction for action cleanup and then Release so the action instance can be reused.
 	 */
-	void AbortCurrentAction();
+	void FinishCurrentAction();
+
+	/**
+	 * Interrupts a currently running action because execution state is being reset.
+	 *
+	 * Running actions receive StopAction before Release so Blueprint/C++ implementations can clean up
+	 * animations, timers, movement requests, latent work, or other resources.
+	 */
+	void InterruptCurrentAction();
+
+	/**
+	 * Releases a selected action that was never started.
+	 *
+	 * This is used when precondition validation fails after an action is selected from a plan but before
+	 * StartAction is called. StopAction is intentionally not called for a NotStarted action.
+	 */
+	void ReleaseSelectedAction();
 
 	/**
 	 * Clears current action, goal, and plan runtime state.
 	 * 
-	 * @param bStopActiveAction If true, the currently active action will be stopped before resetting state.
+	 * @param bInterruptActiveAction If true, a running action will be interrupted before resetting state.
 	 */
-	void ResetExecutionState(bool bStopActiveAction);
+	void ResetExecutionState(bool bInterruptActiveAction);
 };

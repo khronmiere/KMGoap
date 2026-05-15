@@ -48,7 +48,8 @@ EKMGoapActionStatus UKMGoapAgentAction::TickAction(UKMGoapAgentComponent* Agent,
 
 void UKMGoapAgentAction::StopAction(UKMGoapAgentComponent* Agent)
 {
-	// No need to stop if action is not started
+	// StopAction is cleanup for actions that entered execution. A selected action that never started
+	// should be released without receiving OnStop.
 	if (Status == EKMGoapActionStatus::NotStarted)
 	{
 		return;

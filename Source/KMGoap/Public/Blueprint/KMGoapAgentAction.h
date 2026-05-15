@@ -107,7 +107,11 @@ public:
 	EKMGoapActionStatus TickAction(UKMGoapAgentComponent* Agent, float DeltaTime);
 
 	/**
-	 * Stops this action and performs any required cleanup.
+	 * Stops this action and performs cleanup for a started action.
+	 *
+	 * StopAction is called when a running action completes or is interrupted. If the action has not already
+	 * succeeded, stopping it marks it as failed. Actions that were selected but never started may be released
+	 * without receiving StopAction.
 	 *
 	 * @param Agent Agent component that owns and executes this action.
 	 */
@@ -131,9 +135,11 @@ public:
 	EKMGoapActionStatus GetStatus() const { return Status; }
 	
 	/**
-	 * Releases any resources held by this action and marks it as released.
+	 * Releases any resources held by this action and returns it to the reusable NotStarted state.
 	 * 
-	 * This should be called when the action is no longer needed, such as when it is removed from an agent's action queue.
+	 * Release is called after StopAction for started actions, or directly for actions that were selected from
+	 * a plan but never started. Override OnRelease for cleanup that must happen whenever the action leaves the
+	 * state machine, regardless of whether it started.
 	 *
 	 * @param Agent Agent component that owns and executes this action.
 	 */
@@ -208,6 +214,9 @@ protected:
 	/**
 	 * Blueprint/C++ extension point called when the action stops.
 	 *
+	 * OnStop is only intended for actions that have started. Use this to cancel active gameplay work such as
+	 * animations, timers, movement requests, latent tasks, or delegates.
+	 *
 	 * @param Agent Agent component that owns and executes this action.
 	 */
 	UFUNCTION(BlueprintNativeEvent, Category="Action", meta=(BlueprintProtected="true"))
@@ -216,6 +225,9 @@ protected:
 	
 	/**
 	 * Blueprint/C++ extension point called when the action is released.
+	 *
+	 * OnRelease is called whenever the state machine discards this action instance, including actions that were
+	 * selected but never started. Use this for reusable-state cleanup.
 	 *
 	 * @param Agent Agent component that owns and executes this action.
 	 */
