@@ -35,11 +35,18 @@ EKMGoapActionStatus UKMGoapAgentAction::TickAction(UKMGoapAgentComponent* Agent,
 
 void UKMGoapAgentAction::StopAction(UKMGoapAgentComponent* Agent)
 {
-	OnStop(Agent);
-	if (Status == EKMGoapActionStatus::Running)
+	if (Status != EKMGoapActionStatus::Succeeded)
 	{
 		Status = EKMGoapActionStatus::Failed;
 	}
+	
+	OnStop(Agent);
+}
+
+void UKMGoapAgentAction::Release(UKMGoapAgentComponent* Agent)
+{
+	Status = EKMGoapActionStatus::NotStarted;
+	OnRelease(Agent);
 }
 
 TSet<FKMGoapCondition> UKMGoapAgentAction::GetPostConditions() const

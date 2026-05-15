@@ -119,7 +119,17 @@ public:
 	 */
 	UFUNCTION(BlueprintCallable, Category="Action")
 	EKMGoapActionStatus GetStatus() const { return Status; }
-
+	
+	/**
+	 * Releases any resources held by this action and marks it as released.
+	 * 
+	 * This should be called when the action is no longer needed, such as when it is removed from an agent's action queue.
+	 *
+	 * @param Agent Agent component that owns and executes this action.
+	 */
+	UFUNCTION(BlueprintCallable, Category="Action")
+	void Release(UKMGoapAgentComponent* Agent);
+	
 	/**
 	 * Gets the conditions that should be considered true after this action completes.
 	 *
@@ -189,6 +199,15 @@ protected:
 	UFUNCTION(BlueprintNativeEvent, Category="Action", meta=(BlueprintProtected="true"))
 	void OnStop(UKMGoapAgentComponent* Agent);
 	virtual void OnStop_Implementation(UKMGoapAgentComponent* Agent) {}
+	
+	/**
+	 * Blueprint/C++ extension point called when the action is released.
+	 *
+	 * @param Agent Agent component that owns and executes this action.
+	 */
+	UFUNCTION(BlueprintNativeEvent, Category="Action", meta=(BlueprintProtected="true"))
+	void OnRelease(UKMGoapAgentComponent* Agent);
+	virtual void OnRelease_Implementation(UKMGoapAgentComponent* Agent) {}
 
 	/**
 	 * Applies this action's fact changes to the supplied agent.
