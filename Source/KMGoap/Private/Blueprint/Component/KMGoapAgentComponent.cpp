@@ -14,11 +14,9 @@
 #include "Data/KMGoapActionPlan.h"
 #include "Data/KMGoapCondition.h"
 #include "Interface/KMGoapAgentStateMachineInterface.h"
-#include "Interface/KMGoapPlanSearchInterface.h"
 #include "Interface/KMGoapSensorInterface.h"
 #include "Kismet/GameplayStatics.h"
 #include "Subsystem/KMGoapPlannerSubsystem.h"
-#include "Subsystem/Behavior/KMGoapPlanSearchBase.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogGoapAgent, Log, All);
 
@@ -344,35 +342,63 @@ void UKMGoapAgentComponent::UpdateBeliefEvaluationCache()
 	EvaluateBeliefs();
 }
 
-bool UKMGoapAgentComponent::ComputePlanForGoals(
+FKMGoapPlanningRequestHandle UKMGoapAgentComponent::RequestPlanForGoalsAsync(
 	const TArray<UKMGoapAgentGoal*>& GoalsToCheck,
 	UKMGoapAgentGoal* LastGoal,
-	FKMGoapActionPlan& OutPlan)
+	FKMGoapOnPlanAcquired OnPlanAcquired,
+	FKMGoapOnPlanFailed OnPlanFailed)
 {
+	FKMGoapPlanningRequestHandle InvalidHandle;
+
 	UGameInstance* GameInstance = UGameplayStatics::GetGameInstance(GetWorld());
 	if (!GameInstance)
 	{
-		UE_LOG(LogGoapAgent, Error, TEXT("ComputePlanForGoals: GameInstance is NULL"));
-		return false;
+		UE_LOG(LogGoapAgent, Error, TEXT("RequestPlanForGoalsAsync: GameInstance is NULL"));
+		return InvalidHandle;
 	}
 
 	UKMGoapPlannerSubsystem* Planner = GameInstance->GetSubsystem<UKMGoapPlannerSubsystem>();
 	if (!Planner)
 	{
-		UE_LOG(LogGoapAgent, Error, TEXT("ComputePlanForGoals: Planner is NULL"));
-		return false;
+		UE_LOG(LogGoapAgent, Error, TEXT("RequestPlanForGoalsAsync: Planner is NULL"));
+		return InvalidHandle;
 	}
 
-	UKMGoapPlanSearchBase* Algorithm = Planner->GetSearchAlgorithm();
-	if (!Algorithm)
+	FKMGoapPlanningRequest Request;
+	Request.Agent = this;
+	Request.LastGoal = LastGoal;
+	Request.OnPlanAcquired = MoveTemp(OnPlanAcquired);
+	Request.OnPlanFailed = MoveTemp(OnPlanFailed);
+	Request.GoalsToCheck.Reserve(GoalsToCheck.Num());
+
+	for (UKMGoapAgentGoal* Goal : GoalsToCheck)
 	{
-		UE_LOG(LogGoapAgent, Error, TEXT("ComputePlanForGoals: Algorithm is NULL"));
-		return false;
+		if (Goal)
+		{
+			Request.GoalsToCheck.Add(Goal);
+		}
 	}
 
-	// The planner subsystem provides the active search strategy. Passing LastGoal lets
-	// the algorithm preserve goal continuity when doing so is preferable.
-	return IKMGoapPlanSearchInterface::Execute_BuildPlan(Algorithm, this, GoalsToCheck, LastGoal, OutPlan);
+	return Planner->RequestPlanAsync(MoveTemp(Request));
+}
+
+void UKMGoapAgentComponent::CancelPlanRequest(const FKMGoapPlanningRequestHandle& Handle) const
+{
+	if (!Handle.IsValid())
+	{
+		return;
+	}
+
+	UGameInstance* GameInstance = UGameplayStatics::GetGameInstance(GetWorld());
+	if (!GameInstance)
+	{
+		return;
+	}
+
+	if (UKMGoapPlannerSubsystem* Planner = GameInstance->GetSubsystem<UKMGoapPlannerSubsystem>())
+	{
+		Planner->CancelPlanRequest(Handle);
+	}
 }
 
 void UKMGoapAgentComponent::ResetExecutionState() const

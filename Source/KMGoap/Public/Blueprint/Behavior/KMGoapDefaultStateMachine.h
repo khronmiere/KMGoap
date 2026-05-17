@@ -4,6 +4,7 @@
 #include "CoreMinimal.h"
 #include "Data/KMGoapActionPlan.h"
 #include "Interface/KMGoapAgentStateMachineInterface.h"
+#include "Subsystem/Data/KMGoapPlanningRequest.h"
 #include "UObject/Object.h"
 #include "KMGoapDefaultStateMachine.generated.h"
 
@@ -72,6 +73,14 @@ protected:
 	UPROPERTY(BlueprintReadOnly, Category="GOAP|Runtime")
 	FKMGoapActionPlan CurrentPlan;
 
+	/** Handle for the currently pending async planning request. */
+	UPROPERTY(Transient, BlueprintReadOnly, Category="GOAP|Runtime")
+	FKMGoapPlanningRequestHandle PendingPlanHandle;
+
+	/** True while this state machine is waiting for an async planning result. */
+	UPROPERTY(Transient, BlueprintReadOnly, Category="GOAP|Runtime")
+	bool bIsWaitingForPlan = false;
+
 	/** Should include the current goal in replanning when it is still valid. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="GOAP|Planning")
 	bool bIncludeCurrentGoalWhenReplanning = true;
@@ -88,6 +97,34 @@ protected:
 	 * Calculates a new action plan for the agent's available goals.
 	 */
 	void CalculatePlan();
+
+	/**
+	 * Handles successful async planning completion.
+	 *
+	 * @param Handle Handle identifying the completed planning request.
+	 * @param Plan Generated action plan.
+	 */
+	void HandlePlanAcquired(const FKMGoapPlanningRequestHandle& Handle, FKMGoapActionPlan&& Plan);
+
+	/**
+	 * Handles failed async planning completion.
+	 *
+	 * @param Handle Handle identifying the failed planning request.
+	 */
+	void HandlePlanFailed(const FKMGoapPlanningRequestHandle& Handle);
+
+	/**
+	 * Cancels any pending async plan request and clears the local request state.
+	 */
+	void CancelPendingPlanRequest();
+
+	/**
+	 * Checks whether a planner callback belongs to the active pending request.
+	 *
+	 * @param Handle Handle supplied by the planner callback.
+	 * @return True if the callback should be accepted.
+	 */
+	bool IsCurrentPlanRequest(const FKMGoapPlanningRequestHandle& Handle) const;
 
 	/**
 	 * Updates action execution state, including action transitions and completion handling.

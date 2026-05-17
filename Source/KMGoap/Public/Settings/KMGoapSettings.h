@@ -19,7 +19,10 @@ class KMGOAP_API UKMGoapSettings : public UDeveloperSettings
 
 public:
 	/**
-	 * Soft reference to the planner configuration asset used by the GOAP planner.
+	 * Soft reference to the planner configuration asset used by the async GOAP planner.
+	 *
+	 * The configuration supplies runtime search limits such as node budget, maximum
+	 * depth, and worker-side time budget.
 	 */
 	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Planning",
 		meta=(AllowedClasses="/Script/KMGoap.KMGoapPlannerConfig"))
