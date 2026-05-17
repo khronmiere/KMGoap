@@ -41,10 +41,10 @@ Please refer to the following sections to get started and master KMGoap:
 
 | Topic | Description | Link |
 | :--- | :--- | :--- |
-| **Getting Started & Usage** | Installation instructions, basic setup, and a step-by-step tutorial on creating your first GOAP agent. | [Read the Usage Guide](wiki/Usage.md) |
-| **Behavior Breakdown** | Deep dive into how the planner works, the distinction between Facts and Effects, goal priority filtering, and the dynamic knowledge system. | [Read the Behavior Breakdown](wiki/Behavior.md) |
-| **Debugging Tools** | Information on how to debug GOAP agents, including planned integrations with Unreal Engine's Visual Logger (`UE_VLOG`) and the `KMGoapGraph` module. | [Read the Debugging Guide](wiki/Debugging.md) |
-| **Productivity & Authoring** | Best practices for data-driven authoring, managing `GameplayTags`, and structuring your Action, Belief, and Goal sets for maximum reusability. | [Read the Productivity Guide](wiki/Productivity.md) |
+| **Getting Started & Usage** | Installation instructions, basic setup, and a step-by-step tutorial on creating your first GOAP agent. | [Read the Usage Guide](https://github.com/khronmiere/KMGoap/wiki/Usage-Guide) |
+| **Behavior Breakdown** | Deep dive into how the planner works, the distinction between Facts and Effects, goal priority filtering, and the dynamic knowledge system. | [Read the Behavior Breakdown](https://github.com/khronmiere/KMGoap/wiki/Behavior-Breakdown) |
+| **Debugging Tools** | Information on how to debug GOAP agents, including planned integrations with Unreal Engine's Visual Logger (`UE_VLOG`) and the `KMGoapGraph` module. | [Read the Debugging Guide](https://github.com/khronmiere/KMGoap/wiki/Debugging-Guide) |
+| **Productivity & Authoring** | Best practices for data-driven authoring, managing `GameplayTags`, and structuring your Action, Belief, and Goal sets for maximum reusability. | [Read the Productivity Guide](https://github.com/khronmiere/KMGoap/wiki/Productivity-&-Authoring-Guide) |
 
 ---
 
