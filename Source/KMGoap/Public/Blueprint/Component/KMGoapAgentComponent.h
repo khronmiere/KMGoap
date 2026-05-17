@@ -143,10 +143,11 @@ public:
 	FVector GetBeliefLocationByTag(FGameplayTag Tag) const;
 
 	/**
-	 * Sets or updates a simple boolean fact on the agent.
+	 * Sets or updates a runtime-local boolean fact on the agent.
 	 *
-	 * Facts are explicit state values used alongside evaluated beliefs when
-	 * validating action preconditions.
+	 * Runtime facts are explicit agent-owned state values. They may satisfy action
+	 * preconditions and are written by action RuntimeFacts when an action succeeds.
+	 * They are separate from planner-only PredictedEffects.
 	 *
 	 * @param FactTag Tag identifying the fact.
 	 * @param bAdd New fact value to store.
@@ -155,7 +156,7 @@ public:
 	void SetFact(FGameplayTag FactTag, bool bAdd = true);
 
 	/**
-	 * Gets the current value of a stored fact.
+	 * Gets the current value of a stored runtime-local fact.
 	 *
 	 * @param Tag Tag identifying the fact.
 	 * @return Positive or Negative when the fact exists; Unknown otherwise.

@@ -159,6 +159,15 @@ private:
 			}
 
 			TTag Tag = GetTag(Instance);
+			if (TargetMap.Contains(Tag))
+			{
+				UE_LOG(LogTemp, Warning,
+					TEXT("KMGOAP Knowledge Runtime: Duplicate tag [%s] for %s. Existing runtime object will not be overwritten."),
+					*Tag.ToString(),
+					*GetNameSafe(LoadedClass));
+				continue;
+			}
+			
 			TargetMap.Add(Tag, Instance);
 			Result.Add(Tag);
 		}

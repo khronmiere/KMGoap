@@ -1,6 +1,5 @@
 ﻿// All rights reserved by Khrönmière Entertainment.
 #include "Blueprint/KMGoapAgentAction.h"
-
 #include "Blueprint/Component/KMGoapAgentComponent.h"
 
 void UKMGoapAgentAction::StartAction(UKMGoapAgentComponent* Agent)
@@ -14,23 +13,34 @@ void UKMGoapAgentAction::StartAction(UKMGoapAgentComponent* Agent)
 EKMGoapActionStatus UKMGoapAgentAction::TickAction(UKMGoapAgentComponent* Agent, float DeltaTime)
 {
 	// Keep completed, failed, or otherwise unavailable actions stable until the state machine releases them.
-	if (Status != EKMGoapActionStatus::Running || !CanPerform(Agent))
+	if (Status != EKMGoapActionStatus::Running)
 	{
 		return Status;
 	}
 	
+	// If the action cannot be performed, fail immediately
+	if (!CanPerform(Agent))
+	{
+		Status = EKMGoapActionStatus::Failed;
+		return Status;
+	}
+	
 	const EKMGoapActionStatus NewStatus = OnTick(Agent, DeltaTime);
-	if (NewStatus == EKMGoapActionStatus::Running || NewStatus == EKMGoapActionStatus::NotStarted)
+	if (NewStatus == EKMGoapActionStatus::Running)
 	{
 		return Status;
 	}
+	
+	// Guarantee we are not trying to set an invalid status
+	check(NewStatus != EKMGoapActionStatus::NotStarted,
+		TEXT("Only Release process can set an Action status to NotStarted"));
 
-	// Only terminal results are committed. Successful actions materialize their promised facts into the
-	// agent's world state, allowing downstream plan steps and replanning to observe the result.
+	// Only terminal results are committed. Successful actions materialize their runtime facts into the
+	// agent's local state, allowing downstream plan steps and replanning to observe the result.
 	Status = NewStatus;
 	if (Status == EKMGoapActionStatus::Succeeded)
 	{
-		ApplyFacts(Agent);
+		ApplyRuntimeFacts(Agent);
 	}
 
 	return Status;
@@ -38,6 +48,13 @@ EKMGoapActionStatus UKMGoapAgentAction::TickAction(UKMGoapAgentComponent* Agent,
 
 void UKMGoapAgentAction::StopAction(UKMGoapAgentComponent* Agent)
 {
+	// StopAction is cleanup for actions that entered execution. A selected action that never started
+	// should be released without receiving OnStop.
+	if (Status == EKMGoapActionStatus::NotStarted)
+	{
+		return;
+	}
+	
 	// A stopped action that has not already succeeded is treated as failed so interruption cannot be
 	// mistaken for completion by the planner or external observers.
 	if (Status != EKMGoapActionStatus::Succeeded)
@@ -58,10 +75,11 @@ void UKMGoapAgentAction::Release(UKMGoapAgentComponent* Agent)
 
 TSet<FKMGoapCondition> UKMGoapAgentAction::GetPostConditions() const
 {
-	// Planning considers both declarative effects and facts that will be written on success. This allows
-	// actions to contribute to plan satisfaction even when their runtime fact writes are separate from cost/effect data.
-	TSet<FKMGoapCondition> PostConditions = Effects;
-	PostConditions.Append(Facts);
+	// Planning considers both planner-only predicted effects and runtime fact writes.
+	// Runtime execution only applies RuntimeFacts; PredictedEffects must become true through gameplay,
+	// sensors, or beliefs.
+	TSet<FKMGoapCondition> PostConditions = PredictedEffects;
+	PostConditions.Append(RuntimeFacts);
 	return PostConditions;
 }
 
@@ -75,13 +93,14 @@ EKMGoapActionStatus UKMGoapAgentAction::OnTick_Implementation(UKMGoapAgentCompon
 	return EKMGoapActionStatus::Succeeded;
 }
 
-void UKMGoapAgentAction::ApplyFacts(UKMGoapAgentComponent* Agent) const
+void UKMGoapAgentAction::ApplyRuntimeFacts(UKMGoapAgentComponent* Agent) const
 {
 	if (!Agent) return;
 
-	// Facts are authoritative state changes caused by successful execution, not speculative planner effects.
-	for (const FKMGoapCondition& Fact : Facts)
+	// RuntimeFacts are authoritative agent-local state changes caused by successful execution.
+	// PredictedEffects are not written here because they represent planner-only expected outcomes.
+	for (const FKMGoapCondition& RuntimeFact : RuntimeFacts)
 	{
-		Agent->SetFact(Fact.Tag, Fact.bValue);
+		Agent->SetFact(RuntimeFact.Tag, RuntimeFact.bValue);
 	}
 }

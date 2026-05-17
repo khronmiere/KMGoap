@@ -167,7 +167,10 @@ bool UKMGoapPlanSearch_Dijkstra::BuildContext(
 		for (const FGameplayTag& Tag : FactsTags)
 		{
 			EKMGoapBeliefState FactState = Agent->GetFact(Tag);
-			OutCtx.InitialState.Set(Tag, FactState == EKMGoapBeliefState::Positive);
+			if (FactState != EKMGoapBeliefState::Unknown)
+			{
+				OutCtx.InitialState.Set(Tag, FactState == EKMGoapBeliefState::Positive);
+			}
 		}
 
 		TArray<FGameplayTag> BeliefsTags;
@@ -175,7 +178,10 @@ bool UKMGoapPlanSearch_Dijkstra::BuildContext(
 		for (const FGameplayTag& BeliefsTag : BeliefsTags)
 		{
 			EKMGoapBeliefState Result = Agent->EvaluateBeliefByTag(BeliefsTag);
-			OutCtx.InitialState.Set(BeliefsTag, Result == EKMGoapBeliefState::Positive);
+			if (Result != EKMGoapBeliefState::Unknown)
+			{
+				OutCtx.InitialState.Set(BeliefsTag, Result == EKMGoapBeliefState::Positive);
+			}
 		}
 	}
 
@@ -206,13 +212,19 @@ bool UKMGoapPlanSearch_Dijkstra::BuildContext(
 			}
 
 			bool bValue = false;
-			if (OutCtx.InitialState.TryGet(Condition.Tag, bValue))
+			if (!OutCtx.InitialState.TryGet(Condition.Tag, bValue))
 			{
-				if (bValue != Condition.bValue)
-				{
-					bAnyUnsatisfied = true;
-					break;
-				}
+				// Unknown belief-backed conditions are not satisfied. This matches
+				// SatisfiesAll(), which requires every condition to be explicitly present
+				// in the simulated state before it can be considered satisfied.
+				bAnyUnsatisfied = true;
+				break;
+			}
+
+			if (bValue != Condition.bValue)
+			{
+				bAnyUnsatisfied = true;
+				break;
 			}
 		}
 
@@ -272,8 +284,8 @@ bool UKMGoapPlanSearch_Dijkstra::SolveGoalDijkstra(
 	int32 ExpandedNodes = 0;
 
 	// The root state is a copy of the planning snapshot. Every explored node owns
-	// its own simulated state so action effects can be applied without mutating the
-	// real agent.
+	// its own simulated state so planner postconditions can be applied without mutating
+	// the real agent.
 	FKMGoapSimState RootState = Context.InitialState;
 
 	if (SatisfiesAll(RootState, Goal->DesiredEffects))
@@ -499,9 +511,9 @@ uint32 UKMGoapPlanSearch_Dijkstra::HashState(const FKMGoapSimState& State)
 	// produce different hashes for equivalent states. Sorting keys first gives each
 	// logical state a deterministic hash input order.
 	TArray<FGameplayTag> Keys;
-	Keys.Reserve(State.Facts.Num());
+	Keys.Reserve(State.Values.Num());
 
-	for (const TTuple<FGameplayTag, bool>& Pair : State.Facts)
+	for (const TTuple<FGameplayTag, bool>& Pair : State.Values)
 	{
 		Keys.Add(Pair.Key);
 	}
@@ -514,12 +526,12 @@ uint32 UKMGoapPlanSearch_Dijkstra::HashState(const FKMGoapSimState& State)
 	uint32 Hash = 0;
 	for (const FGameplayTag& K : Keys)
 	{
-		const bool* V = State.Facts.Find(K);
+		const bool* V = State.Values.Find(K);
 		Hash = HashCombineFast(Hash, GetTypeHash(K));
 		Hash = HashCombineFast(Hash, GetTypeHash(V ? *V : false));
 	}
 
-	Hash = HashCombineFast(Hash, GetTypeHash(State.Facts.Num()));
+	Hash = HashCombineFast(Hash, GetTypeHash(State.Values.Num()));
 	return Hash;
 }
 

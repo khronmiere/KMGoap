@@ -18,7 +18,7 @@ UCLASS()
 class KMGOAP_API UKMGoapDefaultStateMachine : public UObject, public IKMGoapAgentStateMachineInterface
 {
 	GENERATED_BODY()
-	
+
 public:
 	/**
 	 * Starts the state machine for the supplied GOAP agent.
@@ -71,6 +71,18 @@ protected:
 	/** Current generated action plan for the selected goal. */
 	UPROPERTY(BlueprintReadOnly, Category="GOAP|Runtime")
 	FKMGoapActionPlan CurrentPlan;
+
+	/** Should include the current goal in replanning when it is still valid. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="GOAP|Planning")
+	bool bIncludeCurrentGoalWhenReplanning = true;
+
+	/** Allow switching to goals with equal priority, within a margin. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="GOAP|Planning")
+	bool bAllowEqualPriorityGoalSwitching = true;
+
+	/** Minimum priority advantage required for another goal to replace the current goal. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="GOAP|Planning")
+	float GoalSwitchPriorityMargin = 0.0f;
 	
 	/**
 	 * Calculates a new action plan for the agent's available goals.
@@ -81,9 +93,34 @@ protected:
 	 * Updates action execution state, including action transitions and completion handling.
 	 */
 	void UpdateExecutionState();
+	
+	/**
+	 * Completes lifecycle cleanup for an action that reached a terminal state naturally.
+	 *
+	 * This calls StopAction for action cleanup and then Release so the action instance can be reused.
+	 */
+	void FinishCurrentAction();
+
+	/**
+	 * Interrupts a currently running action because execution state is being reset.
+	 *
+	 * Running actions receive StopAction before Release so Blueprint/C++ implementations can clean up
+	 * animations, timers, movement requests, latent work, or other resources.
+	 */
+	void InterruptCurrentAction();
+
+	/**
+	 * Releases a selected action that was never started.
+	 *
+	 * This is used when precondition validation fails after an action is selected from a plan but before
+	 * StartAction is called. StopAction is intentionally not called for a NotStarted action.
+	 */
+	void ReleaseSelectedAction();
 
 	/**
 	 * Clears current action, goal, and plan runtime state.
+	 * 
+	 * @param bInterruptActiveAction If true, a running action will be interrupted before resetting state.
 	 */
-	void ResetExecutionState();
+	void ResetExecutionState(bool bInterruptActiveAction);
 };

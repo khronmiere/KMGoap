@@ -18,23 +18,24 @@ struct FKMGoapSimState
 	GENERATED_BODY()
 
 	/**
-	 * Boolean fact values indexed by gameplay tag.
+	 * Boolean simulated condition values indexed by gameplay tag.
 	 *
-	 * Each entry represents whether a specific tagged condition is currently
-	 * true or false in this simulated planning state.
+	 * The planner stores both copied runtime facts and cached belief values here.
+	 * This structure represents simulated planning state only; mutating it does not
+	 * write to the agent's real runtime facts or beliefs.
 	 */
-	TMap<FGameplayTag, bool> Facts;
+	TMap<FGameplayTag, bool> Values;
 
 	/**
-	 * Attempts to retrieve the simulated value for a tagged fact.
+	 * Attempts to retrieve the simulated value for a tagged condition.
 	 *
-	 * @param Tag Gameplay tag identifying the fact to look up.
-	 * @param Out Receives the stored value when the fact exists.
-	 * @return True if the fact exists in the simulated state; otherwise false.
+	 * @param Tag Gameplay tag identifying the condition to look up.
+	 * @param Out Receives the stored value when the condition exists.
+	 * @return True if the condition exists in the simulated state; otherwise false.
 	 */
 	bool TryGet(const FGameplayTag& Tag, bool& Out) const
 	{
-		if (const bool* V = Facts.Find(Tag))
+		if (const bool* V = Values.Find(Tag))
 		{
 			Out = *V;
 			return true;
@@ -43,14 +44,14 @@ struct FKMGoapSimState
 	}
 
 	/**
-	 * Sets or overwrites the simulated value for a tagged fact.
+	 * Sets or overwrites the simulated value for a tagged condition.
 	 *
-	 * @param Tag Gameplay tag identifying the fact to update.
-	 * @param bValue New boolean value to store for the fact.
+	 * @param Tag Gameplay tag identifying the condition to update.
+	 * @param bValue New boolean value to store for the condition.
 	 */
 	void Set(const FGameplayTag& Tag, bool bValue)
 	{
-		Facts.Add(Tag, bValue);
+		Values.Add(Tag, bValue);
 	}
 
 	/**

@@ -5,16 +5,18 @@
 #include "Blueprint/KMGoapAgentBelief.h"
 #include "Blueprint/KMGoapAgentGoal.h"
 #include "Blueprint/Component/KMGoapAgentComponent.h"
+#include "Blueprint/Component/KMGoapKnowledgeProviderComponent.h"
 #include "Blueprint/Data/KMGoapActionSet.h"
 #include "Blueprint/Data/KMGoapBeliefSet.h"
 #include "Blueprint/Data/KMGoapGoalSet.h"
 #include "Blueprint/Data/KMGoapKnowledgeModule.h"
+#include "Interface/KMGoapSensorInterface.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogGoapKnowledgeRuntime, Log, All);
 
 bool UKMGoapKnowledgeRuntime::AddKnowledge(UKMGoapAgentComponent* Agent, UKMGoapKnowledgeModule* NewModule)
 {
-	if (!NewModule)
+	if (!Agent || !NewModule)
 	{
 		return false;
 	}
@@ -66,25 +68,64 @@ void UKMGoapKnowledgeRuntime::DeactivateKnowledgesWithTags(UKMGoapAgentComponent
 
 void UKMGoapKnowledgeRuntime::InitializeModule(UKMGoapAgentComponent* Agent, UKMGoapKnowledgeModule* AddedModule)
 {
-	auto BeliefTags = AddInstancesFromSet<UKMGoapAgentBelief>(Agent,
-		AddedModule->BeliefSet->Beliefs,
-		Agent->BeliefsByTag,
-		[](const UKMGoapAgentBelief* B) { return B->BeliefTag; }
-		);
+	if (!Agent || !AddedModule)
+	{
+		UE_LOG(LogGoapKnowledgeRuntime, Warning,
+			TEXT("InitializeModule failed due to invalid Agent or Module."));
+		return;
+	}
 
-	auto ActionTags = AddInstancesFromSet<UKMGoapAgentAction>(
-		Agent,
-		AddedModule->ActionSet->Actions,
-		Agent->ActionsByTag,
-		[](const UKMGoapAgentAction* A) { return A->ActionTag; }
-		);
+	TArray<FGameplayTag> BeliefTags;
+	TArray<FGameplayTag> ActionTags;
+	TArray<FGameplayTag> GoalsTags;
 
-	auto GoalsTags = AddInstancesFromSet<UKMGoapAgentGoal>(
-		Agent,
-		AddedModule->GoalSet->Goals,
-		Agent->GoalsByTag,
-		[](const UKMGoapAgentGoal* G) { return G->GoalTag; }
-		);
+	if (AddedModule->BeliefSet)
+	{
+		BeliefTags = AddInstancesFromSet<UKMGoapAgentBelief>(
+			Agent,
+			AddedModule->BeliefSet->Beliefs,
+			Agent->BeliefsByTag,
+			[](const UKMGoapAgentBelief* B) { return B->BeliefTag; }
+			);
+	}
+	else
+	{
+		UE_LOG(LogGoapKnowledgeRuntime, Warning,
+			TEXT("Knowledge Module [%s] has no BeliefSet assigned."),
+			*GetNameSafe(AddedModule));
+	}
+
+	if (AddedModule->ActionSet)
+	{
+		ActionTags = AddInstancesFromSet<UKMGoapAgentAction>(
+			Agent,
+			AddedModule->ActionSet->Actions,
+			Agent->ActionsByTag,
+			[](const UKMGoapAgentAction* A) { return A->ActionTag; }
+			);
+	}
+	else
+	{
+		UE_LOG(LogGoapKnowledgeRuntime, Warning,
+			TEXT("Knowledge Module [%s] has no ActionSet assigned."),
+			*GetNameSafe(AddedModule));
+	}
+
+	if (AddedModule->GoalSet)
+	{
+		GoalsTags = AddInstancesFromSet<UKMGoapAgentGoal>(
+			Agent,
+			AddedModule->GoalSet->Goals,
+			Agent->GoalsByTag,
+			[](const UKMGoapAgentGoal* G) { return G->GoalTag; }
+			);
+	}
+	else
+	{
+		UE_LOG(LogGoapKnowledgeRuntime, Warning,
+			TEXT("Knowledge Module [%s] has no GoalSet assigned."),
+			*GetNameSafe(AddedModule));
+	}
 	
 	auto TagsGroup = FKMGoapInstancedModuleTags{BeliefTags, ActionTags, GoalsTags};
 	TagGroupPerModule.Add(AddedModule, TagsGroup);

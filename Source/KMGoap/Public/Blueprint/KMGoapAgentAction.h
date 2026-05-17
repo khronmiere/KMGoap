@@ -34,9 +34,12 @@ enum class EKMGoapActionStatus : uint8
  * Defines a single GOAP action that an agent can evaluate, plan with, and execute.
  *
  * A GOAP action represents an executable step in an agent plan. It contains
- * preconditions that must be satisfied before execution, effects that describe
- * the world-state changes produced by the action, and optional runtime facts
- * that may be applied to the owning agent.
+ * preconditions that must be satisfied before execution, predicted effects used by
+ * the planner, and optional runtime facts that are written to the owning agent when
+ * the action succeeds.
+ *
+ * PredictedEffects are simulation-only and are not directly written to the agent.
+ * RuntimeFacts are agent-local state changes and are written on successful execution.
  *
  * Actions are authored as Blueprintable UObject assets and are instanced by
  * an agent at runtime. The agent executor drives the action lifecycle by calling
@@ -67,16 +70,23 @@ public:
 	TSet<FKMGoapCondition> Preconditions;
 
 	/**
-	 * Conditions this action is expected to make true or false after successful completion.
+	 * Planner-only conditions this action is expected to make true or false after successful completion.
+	 *
+	 * These conditions are used when simulating plans, but they are not directly written to the agent's
+	 * runtime fact map. Use these for outcomes that should be observed through gameplay, sensors, or beliefs.
 	 */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Action")
-	TSet<FKMGoapCondition> Effects;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Action|Planning",
+		meta=(ToolTip="Planner-only expected world/belief outcomes. These are not written to the agent at runtime; they should become true through gameplay, sensors, or beliefs."))
+	TSet<FKMGoapCondition> PredictedEffects;
 
 	/**
-	 * Agent-local fact values applied by this action during execution.
+	 * Agent-local fact values written when this action succeeds.
+	 *
+	 * Runtime facts are also included as planner postconditions so future simulated actions can depend on them.
 	 */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Action")
-	TSet<FKMGoapCondition> Facts;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Action|Runtime",
+		meta=(ToolTip="Agent-local fact changes written to the agent when this action succeeds. These also participate in planning as postconditions."))
+	TSet<FKMGoapCondition> RuntimeFacts;
 
 	/**
 	 * Starts this action for the supplied GOAP agent.
@@ -97,7 +107,11 @@ public:
 	EKMGoapActionStatus TickAction(UKMGoapAgentComponent* Agent, float DeltaTime);
 
 	/**
-	 * Stops this action and performs any required cleanup.
+	 * Stops this action and performs cleanup for a started action.
+	 *
+	 * StopAction is called when a running action completes or is interrupted. If the action has not already
+	 * succeeded, stopping it marks it as failed. Actions that were selected but never started may be released
+	 * without receiving StopAction.
 	 *
 	 * @param Agent Agent component that owns and executes this action.
 	 */
@@ -121,9 +135,11 @@ public:
 	EKMGoapActionStatus GetStatus() const { return Status; }
 	
 	/**
-	 * Releases any resources held by this action and marks it as released.
+	 * Releases any resources held by this action and returns it to the reusable NotStarted state.
 	 * 
-	 * This should be called when the action is no longer needed, such as when it is removed from an agent's action queue.
+	 * Release is called after StopAction for started actions, or directly for actions that were selected from
+	 * a plan but never started. Override OnRelease for cleanup that must happen whenever the action leaves the
+	 * state machine, regardless of whether it started.
 	 *
 	 * @param Agent Agent component that owns and executes this action.
 	 */
@@ -131,9 +147,13 @@ public:
 	void Release(UKMGoapAgentComponent* Agent);
 	
 	/**
-	 * Gets the conditions that should be considered true after this action completes.
+	 * Gets every condition that should be considered true in planner simulation after this action completes.
 	 *
-	 * @return Set of post-conditions produced by this action.
+	 * This includes both PredictedEffects and RuntimeFacts:
+	 * - PredictedEffects describe expected world/belief outcomes for planning only.
+	 * - RuntimeFacts describe agent-local fact writes that are applied on successful execution.
+	 *
+	 * @return Set of planner postconditions produced by this action.
 	 */
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category="Action")
 	TSet<FKMGoapCondition> GetPostConditions() const;
@@ -194,6 +214,9 @@ protected:
 	/**
 	 * Blueprint/C++ extension point called when the action stops.
 	 *
+	 * OnStop is only intended for actions that have started. Use this to cancel active gameplay work such as
+	 * animations, timers, movement requests, latent tasks, or delegates.
+	 *
 	 * @param Agent Agent component that owns and executes this action.
 	 */
 	UFUNCTION(BlueprintNativeEvent, Category="Action", meta=(BlueprintProtected="true"))
@@ -203,6 +226,9 @@ protected:
 	/**
 	 * Blueprint/C++ extension point called when the action is released.
 	 *
+	 * OnRelease is called whenever the state machine discards this action instance, including actions that were
+	 * selected but never started. Use this for reusable-state cleanup.
+	 *
 	 * @param Agent Agent component that owns and executes this action.
 	 */
 	UFUNCTION(BlueprintNativeEvent, Category="Action", meta=(BlueprintProtected="true"))
@@ -211,8 +237,12 @@ protected:
 
 	/**
 	 * Applies this action's fact changes to the supplied agent.
+	 * Applies this action's runtime fact changes to the supplied agent.
 	 *
-	 * @param Agent Agent component that receives the fact updates.
+	 * PredictedEffects are intentionally not written here. They are planner-only expectations that should
+	 * become true through gameplay systems, sensors, or evaluated beliefs.
+	 *
+	 * @param Agent Agent component that receives the runtime fact updates.
 	 */
-	void ApplyFacts(UKMGoapAgentComponent* Agent) const;
+	void ApplyRuntimeFacts(UKMGoapAgentComponent* Agent) const;
 };
