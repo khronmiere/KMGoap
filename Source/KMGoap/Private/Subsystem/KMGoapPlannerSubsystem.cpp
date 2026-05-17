@@ -8,7 +8,7 @@
 #include "Blueprint/KMGoapAgentAction.h"
 #include "Blueprint/KMGoapAgentGoal.h"
 #include "Blueprint/Component/KMGoapAgentComponent.h"
-#include "Data/KMGoapActionPlan.h"
+#include "Misc/ScopeExit.h"
 
 
 DEFINE_LOG_CATEGORY_STATIC(LogGoapPlanner, Log, All);
@@ -24,8 +24,10 @@ void UKMGoapPlannerSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 
 void UKMGoapPlannerSubsystem::Deinitialize()
 {
-	// Dropping pending requests prevents callbacks from firing after subsystem shutdown.
+	// Dropping pending and queued requests prevents callbacks from firing after subsystem shutdown.
 	PendingRequests.Reset();
+	QueuedPlanWork.Reset();
+	ActiveAsyncPlanCount = 0;
 	LoadedConfig = nullptr;
 
 	Super::Deinitialize();
@@ -46,7 +48,11 @@ void UKMGoapPlannerSubsystem::LoadPlannerConfig()
 	{
 		UE_LOG(LogGoapPlanner, Warning,
 			TEXT("KMGoap: PlannerConfig not set or failed to load. Async planner will use default limits."));
+		return;
 	}
+
+	MaxConcurrentAsyncPlans = FMath::Max(1, LoadedConfig->MaxConcurrentAsyncPlans);
+	MaxQueuedAsyncPlans = FMath::Max(0, LoadedConfig->MaxQueuedAsyncPlans);
 }
 
 void UKMGoapPlannerSubsystem::ApplyPlanningLimits(FKMGoapPlanningSnapshot& OutSnapshot) const
@@ -79,23 +85,28 @@ FKMGoapPlanningRequestHandle UKMGoapPlannerSubsystem::RequestPlanAsync(FKMGoapPl
 		return Handle;
 	}
 
+	if (MaxQueuedAsyncPlans > 0 && QueuedPlanWork.Num() >= MaxQueuedAsyncPlans)
+	{
+		UE_LOG(LogGoapPlanner, Warning,
+			TEXT("RequestPlanAsync failed: async GOAP planning queue is full. MaxQueuedAsyncPlans=%d"),
+			MaxQueuedAsyncPlans);
+
+		if (Request.OnPlanFailed.IsBound())
+		{
+			Request.OnPlanFailed.Execute(Handle);
+		}
+
+		return Handle;
+	}
+
 	PendingRequests.Add(Handle.RequestId, MoveTemp(PendingRequest));
 
-	TWeakObjectPtr<UKMGoapPlannerSubsystem> WeakThis(this);
+	FQueuedPlanWork Work;
+	Work.Handle = Handle;
+	Work.Snapshot = MoveTemp(Snapshot);
+	QueuedPlanWork.Add(MoveTemp(Work));
 
-	Async(EAsyncExecution::ThreadPool, [WeakThis, Handle, Snapshot = MoveTemp(Snapshot)]() mutable
-	{
-		FKMGoapPlanningSnapshotResult Result;
-		FKMGoapPlanSearchSnapshot::BuildPlan(Snapshot, Result);
-
-		AsyncTask(ENamedThreads::GameThread, [WeakThis, Handle, Result = MoveTemp(Result)]() mutable
-		{
-			if (UKMGoapPlannerSubsystem* Planner = WeakThis.Get())
-			{
-				Planner->CompletePlanRequest(Handle, MoveTemp(Result));
-			}
-		});
-	});
+	TryDispatchQueuedPlanWork();
 
 	return Handle;
 }
@@ -108,6 +119,50 @@ void UKMGoapPlannerSubsystem::CancelPlanRequest(const FKMGoapPlanningRequestHand
 	}
 
 	PendingRequests.Remove(Handle.RequestId);
+
+	QueuedPlanWork.RemoveAllSwap(
+		[&Handle](const FQueuedPlanWork& Work)
+		{
+			return Work.Handle == Handle;
+		},
+		EAllowShrinking::No);
+}
+
+void UKMGoapPlannerSubsystem::TryDispatchQueuedPlanWork()
+{
+	while (ActiveAsyncPlanCount < MaxConcurrentAsyncPlans && !QueuedPlanWork.IsEmpty())
+	{
+		FQueuedPlanWork Work = MoveTemp(QueuedPlanWork[0]);
+		QueuedPlanWork.RemoveAt(0, 1, EAllowShrinking::No);
+
+		if (!Work.Handle.IsValid() || !PendingRequests.Contains(Work.Handle.RequestId))
+		{
+			continue;
+		}
+
+		DispatchPlanWork(MoveTemp(Work));
+	}
+}
+
+void UKMGoapPlannerSubsystem::DispatchPlanWork(FQueuedPlanWork&& Work)
+{
+	ActiveAsyncPlanCount++;
+
+	TWeakObjectPtr<UKMGoapPlannerSubsystem> WeakThis(this);
+
+	Async(EAsyncExecution::ThreadPool, [WeakThis, Work = MoveTemp(Work)]() mutable
+	{
+		FKMGoapPlanningSnapshotResult Result;
+		FKMGoapPlanSearchSnapshot::BuildPlan(Work.Snapshot, Result);
+
+		AsyncTask(ENamedThreads::GameThread, [WeakThis, Handle = Work.Handle, Result = MoveTemp(Result)]() mutable
+		{
+			if (UKMGoapPlannerSubsystem* Planner = WeakThis.Get())
+			{
+				Planner->CompletePlanRequest(Handle, MoveTemp(Result));
+			}
+		});
+	});
 }
 
 bool UKMGoapPlannerSubsystem::BuildPlanningSnapshot(
@@ -223,6 +278,13 @@ void UKMGoapPlannerSubsystem::CompletePlanRequest(
 	FKMGoapPlanningRequestHandle Handle,
 	FKMGoapPlanningSnapshotResult Result)
 {
+	ActiveAsyncPlanCount = FMath::Max(0, ActiveAsyncPlanCount - 1);
+
+	ON_SCOPE_EXIT
+	{
+		TryDispatchQueuedPlanWork();
+	};
+
 	if (!Handle.IsValid())
 	{
 		return;
@@ -244,62 +306,5 @@ void UKMGoapPlannerSubsystem::CompletePlanRequest(
 		return;
 	}
 
-	if (!PendingRequest.RuntimeGoals.IsValidIndex(Result.RuntimeGoalIndex))
-	{
-		if (PendingRequest.OnPlanFailed.IsBound())
-		{
-			PendingRequest.OnPlanFailed.Execute(Handle);
-		}
-
-		return;
-	}
-
-	UKMGoapAgentGoal* Goal = PendingRequest.RuntimeGoals[Result.RuntimeGoalIndex].Get();
-	if (!Goal)
-	{
-		if (PendingRequest.OnPlanFailed.IsBound())
-		{
-			PendingRequest.OnPlanFailed.Execute(Handle);
-		}
-
-		return;
-	}
-
-	FKMGoapActionPlan Plan;
-	Plan.Goal = Goal;
-	Plan.TotalCost = Result.TotalCost;
-	Plan.Actions.Reserve(Result.RuntimeActionIndices.Num());
-
-	for (const int32 RuntimeActionIndex : Result.RuntimeActionIndices)
-	{
-		if (!PendingRequest.RuntimeActions.IsValidIndex(RuntimeActionIndex))
-		{
-			Plan.Reset();
-			break;
-		}
-
-		UKMGoapAgentAction* Action = PendingRequest.RuntimeActions[RuntimeActionIndex].Get();
-		if (!Action)
-		{
-			Plan.Reset();
-			break;
-		}
-
-		Plan.Actions.Add(Action);
-	}
-
-	if (!Plan.IsValid())
-	{
-		if (PendingRequest.OnPlanFailed.IsBound())
-		{
-			PendingRequest.OnPlanFailed.Execute(Handle);
-		}
-
-		return;
-	}
-
-	if (PendingRequest.OnPlanAcquired.IsBound())
-	{
-		PendingRequest.OnPlanAcquired.Execute(Handle, MoveTemp(Plan));
-	}
+	// ... existing code ...
 }

@@ -91,6 +91,43 @@ private:
 	TMap<FGuid, FPendingPlanRequest> PendingRequests;
 
 	/**
+	 * Value-only planning work waiting for an async execution slot.
+	 *
+	 * These entries contain no UObject pointers and are safe to move into worker tasks.
+	 */
+	struct FQueuedPlanWork
+	{
+		FKMGoapPlanningRequestHandle Handle;
+		FKMGoapPlanningSnapshot Snapshot;
+	};
+
+	/** Planning snapshots waiting for a worker slot. */
+	TArray<FQueuedPlanWork> QueuedPlanWork;
+
+	/** Number of GOAP search tasks currently running on worker threads. */
+	int32 ActiveAsyncPlanCount = 0;
+
+	/** Maximum number of GOAP searches allowed to run concurrently. */
+	int32 MaxConcurrentAsyncPlans = 2;
+
+	/** Maximum number of queued planning requests. A value of 0 means unbounded. */
+	int32 MaxQueuedAsyncPlans = 0;
+
+	/**
+	 * Attempts to dispatch queued planning work while async worker slots are available.
+	 *
+	 * This method must be called on the game thread.
+	 */
+	void TryDispatchQueuedPlanWork();
+
+	/**
+	 * Dispatches one immutable planning snapshot to the worker thread pool.
+	 *
+	 * @param Work Queued work item to execute.
+	 */
+	void DispatchPlanWork(FQueuedPlanWork&& Work);
+	
+	/**
 	 * Loads planner configuration from project settings.
 	 */
 	void LoadPlannerConfig();

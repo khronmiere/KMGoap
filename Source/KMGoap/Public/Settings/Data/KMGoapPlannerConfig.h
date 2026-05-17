@@ -19,6 +19,25 @@ class KMGOAP_API UKMGoapPlannerConfig : public UDataAsset
 
 public:
 	/**
+	 * Maximum number of GOAP planning searches allowed to run concurrently.
+	 *
+	 * Requests above this limit remain queued on the game thread until a worker slot
+	 * becomes available. This prevents large AI populations from flooding UE's global
+	 * thread pool when many agents replan in the same frame.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="KMGoap|Planning", meta=(ClampMin="1"))
+	int32 MaxConcurrentAsyncPlans = 2;
+
+	/**
+	 * Maximum number of pending GOAP planning requests allowed in the subsystem queue.
+	 *
+	 * A value of 0 means the queue is unbounded. Keeping this configurable allows large
+	 * projects to apply back-pressure if global events can invalidate many agents at once.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="KMGoap|Planning", meta=(ClampMin="0"))
+	int32 MaxQueuedAsyncPlans = 0;
+
+	/**
 	 * Maximum number of planner nodes that may be expanded during a single plan search.
 	 *
 	 * Higher values allow more exhaustive searches but may increase worker-thread cost.
