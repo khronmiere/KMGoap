@@ -306,5 +306,62 @@ void UKMGoapPlannerSubsystem::CompletePlanRequest(
 		return;
 	}
 
-	// ... existing code ...
+	if (!PendingRequest.RuntimeGoals.IsValidIndex(Result.RuntimeGoalIndex))
+	{
+		if (PendingRequest.OnPlanFailed.IsBound())
+		{
+			PendingRequest.OnPlanFailed.Execute(Handle);
+		}
+
+		return;
+	}
+
+	UKMGoapAgentGoal* Goal = PendingRequest.RuntimeGoals[Result.RuntimeGoalIndex].Get();
+	if (!Goal)
+	{
+		if (PendingRequest.OnPlanFailed.IsBound())
+		{
+			PendingRequest.OnPlanFailed.Execute(Handle);
+		}
+
+		return;
+	}
+
+	FKMGoapActionPlan Plan;
+	Plan.Goal = Goal;
+	Plan.TotalCost = Result.TotalCost;
+	Plan.Actions.Reserve(Result.RuntimeActionIndices.Num());
+
+	for (const int32 RuntimeActionIndex : Result.RuntimeActionIndices)
+	{
+		if (!PendingRequest.RuntimeActions.IsValidIndex(RuntimeActionIndex))
+		{
+			Plan.Reset();
+			break;
+		}
+
+		UKMGoapAgentAction* Action = PendingRequest.RuntimeActions[RuntimeActionIndex].Get();
+		if (!Action)
+		{
+			Plan.Reset();
+			break;
+		}
+
+		Plan.Actions.Add(Action);
+	}
+
+	if (!Plan.IsValid())
+	{
+		if (PendingRequest.OnPlanFailed.IsBound())
+		{
+			PendingRequest.OnPlanFailed.Execute(Handle);
+		}
+
+		return;
+	}
+
+	if (PendingRequest.OnPlanAcquired.IsBound())
+	{
+		PendingRequest.OnPlanAcquired.Execute(Handle, MoveTemp(Plan));
+	}
 }
