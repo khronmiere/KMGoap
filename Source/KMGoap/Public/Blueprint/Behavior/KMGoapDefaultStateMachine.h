@@ -2,6 +2,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Blueprint/Component/KMGoapAgentComponent.h"
 #include "Data/KMGoapActionPlan.h"
 #include "Interface/KMGoapAgentStateMachineInterface.h"
 #include "Subsystem/Data/KMGoapPlanningRequest.h"
@@ -51,6 +52,20 @@ public:
 	 * Sensor changes may invalidate the current plan, goal, or action.
 	 */
 	virtual void OnSensorStateUpdate_Implementation() override;
+	
+	virtual FKMGoapDebugSnapshot GetDebugSnapshot_Implementation() const override;
+
+	/** Gets the currently executing goal. */
+	UKMGoapAgentGoal* GetCurrentGoal() const { return CurrentGoal; }
+
+	/** Gets the currently executing action. */
+	UKMGoapAgentAction* GetCurrentAction() const { return CurrentAction; }
+
+	/** Gets the remaining actions in the current plan. */
+	const TArray<TObjectPtr<UKMGoapAgentAction>>& GetQueuedActions() const { return CurrentPlan.Actions; }
+
+	/** Checks if the state machine is waiting for an async plan. */
+	bool IsWaitingForPlan() const { return bIsWaitingForPlan; }
 
 protected:
 	/** Agent component currently controlled by this state machine. */

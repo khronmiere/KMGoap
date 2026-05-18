@@ -40,6 +40,7 @@ public class KMGoap : ModuleRules
 				"Slate",
 				"SlateCore",
 				"DeveloperSettings",
+				"AIModule", // Required for IVisualLoggerDebugSnapshotInterface
 				// ... add private dependencies that you statically link with here ...	
 			}
 			);

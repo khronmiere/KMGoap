@@ -8,6 +8,7 @@
 #include "Blueprint/Behavior/KMGoapDefaultStateMachine.h"
 #include "Blueprint/Behavior/KMGoapKnowledgeRuntime.h"
 #include "Blueprint/Component/KMGoapKnowledgeProviderComponent.h"
+#include "VisualLogger/VisualLogger.h"
 #include "Blueprint/Data/KMGoapActionSet.h"
 #include "Blueprint/Data/KMGoapBeliefSet.h"
 #include "Blueprint/Data/KMGoapGoalSet.h"
@@ -181,6 +182,80 @@ void UKMGoapAgentComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	StopStateMachineRunner();
 	Super::EndPlay(EndPlayReason);
 }
+
+#if ENABLE_VISUAL_LOG
+void UKMGoapAgentComponent::GrabDebugSnapshot(FVisualLogEntry* Snapshot) const
+{
+	FKMGoapDebugSnapshot DebugData = GetDebugSnapshot();
+
+	const int32 CategoryIndex = Snapshot->Status.AddZeroed();
+	FVisualLogStatusCategory& Category = Snapshot->Status[CategoryIndex];
+	Category.Category = TEXT("GOAP Agent State");
+
+	// Goal
+	if (DebugData.CurrentGoal)
+	{
+		Category.Add(TEXT("Current Goal"), FString::Printf(TEXT("%s (Priority: %.1f)"), 
+			*DebugData.CurrentGoal->GoalTag.ToString(), 
+			DebugData.CurrentGoal->GetPriority(this)));
+	}
+	else
+	{
+		Category.Add(TEXT("Current Goal"), TEXT("None"));
+	}
+
+	// Action
+	if (DebugData.CurrentAction)
+	{
+		FString StatusStr = TEXT("Unknown");
+		switch (DebugData.CurrentAction->GetStatus())
+		{
+			case EKMGoapActionStatus::NotStarted: StatusStr = TEXT("Not Started"); break;
+			case EKMGoapActionStatus::Running: StatusStr = TEXT("Running"); break;
+			case EKMGoapActionStatus::Succeeded: StatusStr = TEXT("Succeeded"); break;
+			case EKMGoapActionStatus::Failed: StatusStr = TEXT("Failed"); break;
+		}
+		Category.Add(TEXT("Current Action"), FString::Printf(TEXT("%s [%s]"), 
+			*DebugData.CurrentAction->ActionTag.ToString(), *StatusStr));
+	}
+	else
+	{
+		Category.Add(TEXT("Current Action"), TEXT("None"));
+	}
+
+	// Plan
+	if (DebugData.bIsWaitingForPlan)
+	{
+		Category.Add(TEXT("Plan Status"), TEXT("Waiting for Async Plan..."));
+	}
+	else
+	{
+		Category.Add(TEXT("Plan Status"), FString::Printf(TEXT("%d actions queued"), DebugData.QueuedActions.Num()));
+	}
+
+	// Facts
+	FString FactsStr;
+	for (const auto& Pair : DebugData.Facts)
+	{
+		FactsStr += FString::Printf(TEXT("%s: %s, "), *Pair.Key.ToString(), Pair.Value ? TEXT("True") : TEXT("False"));
+	}
+	if (!FactsStr.IsEmpty())
+	{
+		Category.Add(TEXT("Facts"), FactsStr);
+	}
+
+	// Beliefs
+	FString BeliefsStr;
+	for (const auto& Pair : DebugData.Beliefs)
+	{
+		BeliefsStr += FString::Printf(TEXT("%s: %s, "), *Pair.Key.ToString(), Pair.Value ? TEXT("True") : TEXT("False"));
+	}
+	if (!BeliefsStr.IsEmpty())
+	{
+		Category.Add(TEXT("Beliefs"), BeliefsStr);
+	}
+}
+#endif
 
 void UKMGoapAgentComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
@@ -407,6 +482,11 @@ void UKMGoapAgentComponent::ResetExecutionState() const
 	{
 		IKMGoapAgentStateMachineInterface::Execute_Reset(StateMachineRunner);
 	}
+}
+
+FKMGoapDebugSnapshot UKMGoapAgentComponent::GetDebugSnapshot() const
+{
+	return IKMGoapAgentStateMachineInterface::Execute_GetDebugSnapshot(StateMachineRunner);
 }
 
 void UKMGoapAgentComponent::BuildBeliefs()

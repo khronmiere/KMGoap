@@ -7,6 +7,7 @@
 #include "Data/KMGoapActionPlan.h"
 #include "Data/KMGoapCondition.h"
 #include "Subsystem/Data/KMGoapPlanningRequest.h"
+#include "VisualLogger/VisualLoggerDebugSnapshotInterface.h"
 #include "KMGoapAgentComponent.generated.h"
 
 struct FKMGoapCondition;
@@ -41,6 +42,40 @@ struct KMGOAP_API FKMGoapBeliefCacheEntry
 };
 
 /**
+ * Read-only snapshot of the agent's current execution and knowledge state.
+ * Used by the editor details panel and Visual Logger for debugging.
+ */
+USTRUCT(BlueprintType)
+struct KMGOAP_API FKMGoapDebugSnapshot
+{
+	GENERATED_BODY()
+
+	/** The currently executing goal, if any. */
+	UPROPERTY(BlueprintReadOnly, Category="GOAP|Debug")
+	TObjectPtr<UKMGoapAgentGoal> CurrentGoal = nullptr;
+
+	/** The currently executing action, if any. */
+	UPROPERTY(BlueprintReadOnly, Category="GOAP|Debug")
+	TObjectPtr<UKMGoapAgentAction> CurrentAction = nullptr;
+
+	/** The remaining actions in the current plan. */
+	UPROPERTY(BlueprintReadOnly, Category="GOAP|Debug")
+	TArray<TObjectPtr<UKMGoapAgentAction>> QueuedActions;
+
+	/** True if the agent is currently waiting for an async plan to compute. */
+	UPROPERTY(BlueprintReadOnly, Category="GOAP|Debug")
+	bool bIsWaitingForPlan = false;
+
+	/** All currently known explicit facts. */
+	UPROPERTY(BlueprintReadOnly, Category="GOAP|Debug")
+	TMap<FGameplayTag, bool> Facts;
+
+	/** All currently evaluated beliefs. */
+	UPROPERTY(BlueprintReadOnly, Category="GOAP|Debug")
+	TMap<FGameplayTag, bool> Beliefs;
+};
+
+/**
  * Actor component that owns and coordinates an agent's GOAP runtime state.
  *
  * The GOAP agent component is responsible for:
@@ -56,7 +91,7 @@ struct KMGOAP_API FKMGoapBeliefCacheEntry
  * sensor components implementing the GOAP sensor interface to the same actor.
  */
 UCLASS(ClassGroup=(KMGoap), BlueprintType, Blueprintable, Category = "KMGoap|ActorComponents", meta=(BlueprintSpawnableComponent))
-class KMGOAP_API UKMGoapAgentComponent : public UActorComponent
+class KMGOAP_API UKMGoapAgentComponent : public UActorComponent, public IVisualLoggerDebugSnapshotInterface
 {
 	GENERATED_BODY()
 
@@ -224,6 +259,15 @@ public:
 
 	/** Resets the active state-machine runner execution state, if one exists. */
 	void ResetExecutionState() const;
+
+	/**
+	 * Generates a read-only snapshot of the agent's current execution and knowledge state.
+	 * Intended for editor debugging and Visual Logger integration.
+	 *
+	 * @return A snapshot containing the current goal, action, plan, facts, and beliefs.
+	 */
+	UFUNCTION(BlueprintCallable, Category="GOAP|Debug")
+	FKMGoapDebugSnapshot GetDebugSnapshot() const;
 	
 	/** Initializes sensors, runtime GOAP objects, state machine, and knowledge runtime. */
 	virtual void BeginPlay() override;
@@ -233,6 +277,11 @@ public:
 
 	/** Ticks the state-machine runner and knowledge runtime. */
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
+
+#if ENABLE_VISUAL_LOG
+	/** IVisualLoggerDebugSnapshotInterface implementation */
+	virtual void GrabDebugSnapshot(FVisualLogEntry* Snapshot) const override;
+#endif
 
 protected:
 	/**

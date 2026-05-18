@@ -69,4 +69,13 @@ public:
 	 */
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category="GOAP|StateMachine")
 	void OnSensorStateUpdate();
+
+	/**
+	 * Get a State Snapshot for debugging purposes.
+	 * 
+	 * @param Agent The current agent component
+	 * @return a snapshot of the current state
+	 */
+	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category="GOAP|StateMachine")
+	FKMGoapDebugSnapshot GetDebugSnapshot() const;
 };

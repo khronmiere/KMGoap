@@ -44,7 +44,7 @@ public:
 	 * @return Priority value used to compare this goal against other available goals.
 	 */
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category="Goal")
-	float GetPriority(UKMGoapAgentComponent* Agent) const { return Native_GetPriority(Agent); }
+	float GetPriority(const UKMGoapAgentComponent* Agent) const { return Native_GetPriority(Agent); }
 
 protected:
 	/**
@@ -63,7 +63,7 @@ protected:
 	 * @param Agent Agent component evaluating this goal.
 	 * @return Runtime priority for this goal.
 	 */
-	virtual float Native_GetPriority(UKMGoapAgentComponent* Agent) const;
+	virtual float Native_GetPriority(const UKMGoapAgentComponent* Agent) const;
 
 	/**
 	 * Blueprint-overridable priority calculation.
@@ -72,7 +72,7 @@ protected:
 	 * @return Runtime priority for this goal.
 	 */
 	UFUNCTION(BlueprintNativeEvent, Category="Goal", meta=(BlueprintProtected="true"))
-	float Priority(UKMGoapAgentComponent* Agent) const;
+	float Priority(const UKMGoapAgentComponent* Agent) const;
 
 	/**
 	 * Default implementation of the Blueprint priority event.
@@ -80,5 +80,5 @@ protected:
 	 * @param Agent Agent component evaluating this goal.
 	 * @return Runtime priority for this goal.
 	 */
-	virtual float Priority_Implementation(UKMGoapAgentComponent* Agent) const;
+	virtual float Priority_Implementation(const UKMGoapAgentComponent* Agent) const;
 };

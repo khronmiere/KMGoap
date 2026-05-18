@@ -3,6 +3,9 @@
 #include "Blueprint/KMGoapAgentAction.h"
 #include "Blueprint/KMGoapAgentGoal.h"
 #include "Blueprint/Component/KMGoapAgentComponent.h"
+#include "Kismet/GameplayStatics.h"
+#include "Subsystem/KMGoapPlannerSubsystem.h"
+#include "VisualLogger/VisualLogger.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogGoapDefaultStateMachine, Log, All);
 
@@ -155,6 +158,29 @@ void UKMGoapDefaultStateMachine::OnSensorStateUpdate_Implementation()
 	UE_LOG(LogGoapDefaultStateMachine, Log, TEXT("Sensor Update received"));
 }
 
+FKMGoapDebugSnapshot UKMGoapDefaultStateMachine::GetDebugSnapshot_Implementation() const
+{
+	FKMGoapDebugSnapshot Snapshot;
+	Snapshot.bIsWaitingForPlan = bIsWaitingForPlan;
+	Snapshot.CurrentAction = CurrentAction;
+	Snapshot.CurrentGoal = CurrentGoal;
+	Snapshot.QueuedActions = CurrentPlan.Actions;
+	
+	TArray<FGameplayTag> BeliefsTags;
+	Agent->BeliefsByTag.GetKeys(BeliefsTags);
+	for (auto Tag : BeliefsTags)
+	{
+		Snapshot.Beliefs.Add(Tag, Agent->EvaluateBeliefByTag(Tag) == EKMGoapBeliefState::Positive);
+	}
+	
+	for (auto Tag : Agent->GetFactsTags())
+	{
+		Snapshot.Facts.Add(Tag, Agent->GetFact(Tag) == EKMGoapBeliefState::Positive);
+	}
+	
+	return Snapshot;
+}
+
 void UKMGoapDefaultStateMachine::CalculatePlan()
 {
 	if (!Agent)
@@ -240,39 +266,54 @@ void UKMGoapDefaultStateMachine::CalculatePlan()
 	}
 }
 
-void UKMGoapDefaultStateMachine::HandlePlanAcquired(
-	const FKMGoapPlanningRequestHandle& Handle,
-	FKMGoapActionPlan&& Plan)
-{
-	if (!IsCurrentPlanRequest(Handle))
+	void UKMGoapDefaultStateMachine::HandlePlanAcquired(
+		const FKMGoapPlanningRequestHandle& Handle,
+		FKMGoapActionPlan&& Plan)
 	{
-		return;
+		if (!IsCurrentPlanRequest(Handle))
+		{
+			return;
+		}
+	
+		bIsWaitingForPlan = false;
+		PendingPlanHandle.Reset();
+	
+		if (!Plan.IsValid())
+		{
+			UE_LOG(LogGoapDefaultStateMachine, Verbose, TEXT("HandlePlanAcquired: received invalid plan."));
+			return;
+		}
+	
+		CurrentPlan = MoveTemp(Plan);
+
+#if ENABLE_VISUAL_LOG
+		if (Agent && Agent->GetOwner())
+		{
+			UE_VLOG(Agent->GetOwner(), LogGoapDefaultStateMachine, Log, TEXT("Plan acquired for goal [%s] with %d actions."),
+				*CurrentPlan.Goal->GoalTag.ToString(), CurrentPlan.Actions.Num());
+		}
+#endif
 	}
 
-	bIsWaitingForPlan = false;
-	PendingPlanHandle.Reset();
-
-	if (!Plan.IsValid())
+	void UKMGoapDefaultStateMachine::HandlePlanFailed(const FKMGoapPlanningRequestHandle& Handle)
 	{
-		UE_LOG(LogGoapDefaultStateMachine, Verbose, TEXT("HandlePlanAcquired: received invalid plan."));
-		return;
+		if (!IsCurrentPlanRequest(Handle))
+		{
+			return;
+		}
+	
+		bIsWaitingForPlan = false;
+		PendingPlanHandle.Reset();
+	
+		UE_LOG(LogGoapDefaultStateMachine, Verbose, TEXT("CalculatePlan: no valid plan found."));
+
+#if ENABLE_VISUAL_LOG
+		if (Agent && Agent->GetOwner())
+		{
+			UE_VLOG(Agent->GetOwner(), LogGoapDefaultStateMachine, Warning, TEXT("Failed to acquire plan. Agent will idle."));
+		}
+#endif
 	}
-
-	CurrentPlan = MoveTemp(Plan);
-}
-
-void UKMGoapDefaultStateMachine::HandlePlanFailed(const FKMGoapPlanningRequestHandle& Handle)
-{
-	if (!IsCurrentPlanRequest(Handle))
-	{
-		return;
-	}
-
-	bIsWaitingForPlan = false;
-	PendingPlanHandle.Reset();
-
-	UE_LOG(LogGoapDefaultStateMachine, Verbose, TEXT("CalculatePlan: no valid plan found."));
-}
 
 void UKMGoapDefaultStateMachine::CancelPendingPlanRequest()
 {
@@ -299,19 +340,26 @@ bool UKMGoapDefaultStateMachine::IsCurrentPlanRequest(const FKMGoapPlanningReque
 		PendingPlanHandle == Handle;
 }
 
-void UKMGoapDefaultStateMachine::UpdateExecutionState()
-{
-	if (!CurrentPlan.IsValid())
+	void UKMGoapDefaultStateMachine::UpdateExecutionState()
 	{
-		UE_LOG(LogGoapDefaultStateMachine, Log, TEXT("Attempt to update execution state with invalid plan"));
-		return;
+		if (!CurrentPlan.IsValid())
+		{
+			UE_LOG(LogGoapDefaultStateMachine, Log, TEXT("Attempt to update execution state with invalid plan"));
+			return;
+		}
+	
+		CurrentGoal = CurrentPlan.Goal;
+	
+		// Plans are consumed from the front. The state machine owns only the active action at any time;
+		// the remaining actions stay queued in CurrentPlan.
+		CurrentAction = CurrentPlan.Actions[0];
+		CurrentPlan.Actions.RemoveAt(0);
+		UE_LOG(LogGoapDefaultStateMachine, Log, TEXT("Execution State Updated. Next Action: %s"), *CurrentAction->GetName());
+
+#if ENABLE_VISUAL_LOG
+		if (Agent && Agent->GetOwner())
+		{
+			UE_VLOG(Agent->GetOwner(), LogGoapDefaultStateMachine, Log, TEXT("Starting action [%s]."), *CurrentAction->ActionTag.ToString());
+		}
+#endif
 	}
-
-	CurrentGoal = CurrentPlan.Goal;
-
-	// Plans are consumed from the front. The state machine owns only the active action at any time;
-	// the remaining actions stay queued in CurrentPlan.
-	CurrentAction = CurrentPlan.Actions[0];
-	CurrentPlan.Actions.RemoveAt(0);
-	UE_LOG(LogGoapDefaultStateMachine, Log, TEXT("Execution State Updated. Next Action: %s"), *CurrentAction->GetName());
-}
