@@ -6,6 +6,8 @@
 
 namespace
 {
+	// Small continuity bias used only as a tie-breaker so the planner slightly favors
+	// staying with the recent goal when priorities are otherwise effectively equal.
 	constexpr float RecentGoalBias = 0.01f;
 }
 
@@ -28,6 +30,8 @@ bool FKMGoapPlanSearchSnapshot::BuildPlan(
 		return PA > PB;
 	});
 
+	// Goals are attempted in priority order. The first solvable goal wins, which keeps
+	// lower-priority goals from replacing a higher-priority goal just because they are cheaper.
 	for (const FKMGoapGoalSnapshot& Goal : GoalsSorted)
 	{
 		FKMGoapPlanningSnapshotResult Trial;
@@ -138,6 +142,8 @@ bool FKMGoapPlanSearchSnapshot::SolveGoal(
 
 		const FNode& Current = Nodes[Item.NodeIndex];
 
+		// The heap can contain older entries for a state if a cheaper path was discovered later.
+		// Skip those stale entries so expansion always follows the best known cost for the state.
 		if (const float* Best = BestCostByState.Find(Current.StateHash))
 		{
 			if (Current.Cost > *Best + KINDA_SMALL_NUMBER)
@@ -177,6 +183,8 @@ bool FKMGoapPlanSearchSnapshot::SolveGoal(
 			const float NextCost = Current.Cost + Action.Cost;
 			const uint32 NextHash = HashState(NextState);
 			
+			// Dijkstra pruning: once a state has been reached at an equal or lower cost,
+			// any more expensive path to the same simulated state cannot improve the final plan.
 			if (const float* Existing = BestCostByState.Find(NextHash))
 			{
 				if (NextCost >= *Existing)
@@ -208,6 +216,8 @@ bool FKMGoapPlanSearchSnapshot::SolveGoal(
 	TArray<int32> ReverseActionIndices;
 	ReverseActionIndices.Reserve(16);
 
+	// Nodes store only parent links, so reconstruct the selected path by walking
+	// backward from the solved node to the root and reversing the collected actions.
 	int32 Cursor = SolutionIndex;
 	while (Cursor != INDEX_NONE)
 	{
@@ -266,6 +276,8 @@ uint32 FKMGoapPlanSearchSnapshot::HashState(const FKMGoapSimState& State)
 		Keys.Add(Pair.Key);
 	}
 
+	// TMap iteration order is not stable, so sort keys before hashing to ensure
+	// equivalent simulated states produce the same hash regardless of insertion order.
 	Keys.Sort([](const FGameplayTag& A, const FGameplayTag& B)
 	{
 		return A.ToString() < B.ToString();
