@@ -6,6 +6,7 @@
 #include "Components/ActorComponent.h"
 #include "Data/KMGoapActionPlan.h"
 #include "Data/KMGoapCondition.h"
+#include "Subsystem/Data/KMGoapPlanningRequest.h"
 #include "KMGoapAgentComponent.generated.h"
 
 struct FKMGoapCondition;
@@ -195,21 +196,31 @@ public:
 
 	/** Re-evaluates all runtime beliefs and refreshes the belief cache immediately. */
 	void UpdateBeliefEvaluationCache();
-
+	
 	/**
-	 * Requests a GOAP plan for the provided goals.
+	 * Requests a GOAP plan asynchronously for the provided goals.
 	 *
-	 * Delegates planning to the configured planner subsystem and search algorithm.
+	 * The request is snapshotted on the game thread and searched on a worker thread.
+	 * Completion callbacks are always invoked on the game thread.
 	 *
 	 * @param GoalsToCheck Candidate goals to plan for.
 	 * @param LastGoal Previously selected goal, used by planners that account for goal continuity.
-	 * @param OutPlan Receives the generated action plan on success.
-	 * @return true if a valid plan was produced.
+	 * @param OnPlanAcquired Callback invoked when a valid plan is produced.
+	 * @param OnPlanFailed Callback invoked when no valid plan is found or the request cannot be queued.
+	 * @return Handle that can be used to track or cancel the request.
 	 */
-	bool ComputePlanForGoals(
+	FKMGoapPlanningRequestHandle RequestPlanForGoalsAsync(
 		const TArray<UKMGoapAgentGoal*>& GoalsToCheck,
 		UKMGoapAgentGoal* LastGoal,
-		FKMGoapActionPlan& OutPlan);
+		FKMGoapOnPlanAcquired OnPlanAcquired,
+		FKMGoapOnPlanFailed OnPlanFailed);
+
+	/**
+	 * Cancels a pending async GOAP planning request.
+	 *
+	 * @param Handle Request handle returned by RequestPlanForGoalsAsync.
+	 */
+	void CancelPlanRequest(const FKMGoapPlanningRequestHandle& Handle) const;
 
 	/** Resets the active state-machine runner execution state, if one exists. */
 	void ResetExecutionState() const;

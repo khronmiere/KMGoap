@@ -29,13 +29,18 @@ void UKMGoapDefaultStateMachine::Tick_Implementation(float DeltaTime)
 {
 	if (!CurrentAction)
 	{
-		UE_LOG(LogGoapDefaultStateMachine, Log, TEXT("No Action, Calculating a new Plan"));
-
-		// Planning is deferred until an action is needed. This keeps sensor invalidations cheap:
-		// they only clear state, and the next tick decides whether a new plan is still required.
+		// Planning is requested only when execution needs a new action. Async requests
+		// are issued once and completed through planner callbacks, so the game thread
+		// never blocks while the search runs.
 		if (!CurrentPlan.IsValid())
 		{
-			CalculatePlan();
+			if (!bIsWaitingForPlan)
+			{
+				UE_LOG(LogGoapDefaultStateMachine, Log, TEXT("No Plan, Calculating a new one"));
+				CalculatePlan();
+			}
+
+			return;
 		}
 
 		if (CurrentPlan.IsValid())
@@ -120,6 +125,8 @@ void UKMGoapDefaultStateMachine::ReleaseSelectedAction()
 
 void UKMGoapDefaultStateMachine::ResetExecutionState(bool bInterruptActiveAction)
 {
+	CancelPendingPlanRequest();
+
 	if (bInterruptActiveAction)
 	{
 		InterruptCurrentAction();
@@ -128,7 +135,7 @@ void UKMGoapDefaultStateMachine::ResetExecutionState(bool bInterruptActiveAction
 	{
 		ReleaseSelectedAction();
 	}
-	
+
 	CurrentGoal = nullptr;
 	CurrentPlan.Reset();
 }
@@ -153,6 +160,11 @@ void UKMGoapDefaultStateMachine::CalculatePlan()
 	if (!Agent)
 	{
 		UE_LOG(LogGoapDefaultStateMachine, Warning, TEXT("CalculatePlan failed: Agent is null."));
+		return;
+	}
+
+	if (bIsWaitingForPlan)
+	{
 		return;
 	}
 
@@ -208,23 +220,90 @@ void UKMGoapDefaultStateMachine::CalculatePlan()
 		return;
 	}
 
-	FKMGoapActionPlan NewPlan;
+	FKMGoapOnPlanAcquired OnPlanAcquired;
+	OnPlanAcquired.BindUObject(this, &UKMGoapDefaultStateMachine::HandlePlanAcquired);
 
-	// The planner receives LastGoal as context so search implementations can bias against
-	// oscillating between recently completed goals if they choose to.
-	if (Agent->ComputePlanForGoals(GoalsToCheck, LastGoal, NewPlan) && NewPlan.IsValid())
+	FKMGoapOnPlanFailed OnPlanFailed;
+	OnPlanFailed.BindUObject(this, &UKMGoapDefaultStateMachine::HandlePlanFailed);
+
+	PendingPlanHandle = Agent->RequestPlanForGoalsAsync(
+		GoalsToCheck,
+		LastGoal,
+		MoveTemp(OnPlanAcquired),
+		MoveTemp(OnPlanFailed));
+
+	bIsWaitingForPlan = PendingPlanHandle.IsValid();
+
+	if (!bIsWaitingForPlan)
 	{
-		CurrentPlan = MoveTemp(NewPlan);
+		UE_LOG(LogGoapDefaultStateMachine, Verbose, TEXT("CalculatePlan: async request could not be queued."));
+	}
+}
+
+void UKMGoapDefaultStateMachine::HandlePlanAcquired(
+	const FKMGoapPlanningRequestHandle& Handle,
+	FKMGoapActionPlan&& Plan)
+{
+	if (!IsCurrentPlanRequest(Handle))
+	{
 		return;
 	}
-	
+
+	bIsWaitingForPlan = false;
+	PendingPlanHandle.Reset();
+
+	if (!Plan.IsValid())
+	{
+		UE_LOG(LogGoapDefaultStateMachine, Verbose, TEXT("HandlePlanAcquired: received invalid plan."));
+		return;
+	}
+
+	CurrentPlan = MoveTemp(Plan);
+}
+
+void UKMGoapDefaultStateMachine::HandlePlanFailed(const FKMGoapPlanningRequestHandle& Handle)
+{
+	if (!IsCurrentPlanRequest(Handle))
+	{
+		return;
+	}
+
+	bIsWaitingForPlan = false;
+	PendingPlanHandle.Reset();
+
 	UE_LOG(LogGoapDefaultStateMachine, Verbose, TEXT("CalculatePlan: no valid plan found."));
+}
+
+void UKMGoapDefaultStateMachine::CancelPendingPlanRequest()
+{
+	if (!PendingPlanHandle.IsValid())
+	{
+		bIsWaitingForPlan = false;
+		return;
+	}
+
+	if (Agent)
+	{
+		Agent->CancelPlanRequest(PendingPlanHandle);
+	}
+
+	PendingPlanHandle.Reset();
+	bIsWaitingForPlan = false;
+}
+
+bool UKMGoapDefaultStateMachine::IsCurrentPlanRequest(const FKMGoapPlanningRequestHandle& Handle) const
+{
+	return bIsWaitingForPlan &&
+		PendingPlanHandle.IsValid() &&
+		Handle.IsValid() &&
+		PendingPlanHandle == Handle;
 }
 
 void UKMGoapDefaultStateMachine::UpdateExecutionState()
 {
 	if (!CurrentPlan.IsValid())
 	{
+		UE_LOG(LogGoapDefaultStateMachine, Log, TEXT("Attempt to update execution state with invalid plan"));
 		return;
 	}
 
@@ -234,4 +313,5 @@ void UKMGoapDefaultStateMachine::UpdateExecutionState()
 	// the remaining actions stay queued in CurrentPlan.
 	CurrentAction = CurrentPlan.Actions[0];
 	CurrentPlan.Actions.RemoveAt(0);
+	UE_LOG(LogGoapDefaultStateMachine, Log, TEXT("Execution State Updated. Next Action: %s"), *CurrentAction->GetName());
 }

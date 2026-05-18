@@ -32,8 +32,7 @@ EKMGoapActionStatus UKMGoapAgentAction::TickAction(UKMGoapAgentComponent* Agent,
 	}
 	
 	// Guarantee we are not trying to set an invalid status
-	check(NewStatus != EKMGoapActionStatus::NotStarted,
-		TEXT("Only Release process can set an Action status to NotStarted"));
+	check(NewStatus != EKMGoapActionStatus::NotStarted);
 
 	// Only terminal results are committed. Successful actions materialize their runtime facts into the
 	// agent's local state, allowing downstream plan steps and replanning to observe the result.

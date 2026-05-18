@@ -71,33 +71,119 @@ struct FKMGoapSimState
 };
 
 /**
- * Planning input context passed to GOAP search algorithms.
+ * Describes why a planning snapshot search failed.
  *
- * This structure groups together the immutable initial state, the requesting
- * agent, and the filtered action list available for a single planning request.
+ * This is intentionally value-only so it can be written by worker-thread planner code
+ * and inspected later on the game thread.
  */
-struct FKMGoapPlanningContext
+enum class EKMGoapPlanningFailureReason : uint8
 {
-	/**
-	 * Initial simulated state copied from the agent at the start of planning.
-	 *
-	 * Search algorithms should use this as the root state for plan expansion.
-	 */
+	/** No failure occurred. */
+	None,
+
+	/** The snapshot did not contain enough goals or actions to search. */
+	InvalidSnapshot,
+
+	/** The search exhausted available paths without satisfying a goal. */
+	NoPlanFound,
+
+	/** The search stopped because Operation budget was reached. */
+	BudgetExceeded,
+	
+	/** The search failed because the selected solution produced no executable actions. */
+	EmptySolution,
+	
+	/** The search failed because the selected goal was already satisfied. */
+	GoalSatisfied
+};
+
+/**
+ * Thread-safe value snapshot of an action used by asynchronous planning.
+ *
+ * This struct intentionally stores only plain data copied on the game thread.
+ * Worker threads must not read UObject state, call Blueprint events, or query the
+ * world while planning.
+ */
+struct FKMGoapActionSnapshot
+{
+	/** Index of the runtime action inside the request's action pointer table. */
+	int32 RuntimeActionIndex = INDEX_NONE;
+
+	/** Planning cost captured on the game thread. */
+	float Cost = 1.f;
+
+	/** Conditions required before the action can be applied in simulated state. */
+	TSet<FKMGoapCondition> Preconditions;
+
+	/** Conditions produced by the action in simulated state. */
+	TSet<FKMGoapCondition> Postconditions;
+};
+
+/**
+ * Thread-safe value snapshot of a goal used by asynchronous planning.
+ */
+struct FKMGoapGoalSnapshot
+{
+	/** Index of the runtime goal inside the request's goal pointer table. */
+	int32 RuntimeGoalIndex = INDEX_NONE;
+
+	/** Runtime priority captured on the game thread. */
+	float Priority = 0.f;
+
+	/** Whether this goal is the request's most recently selected/completed goal. */
+	bool bIsMostRecentGoal = false;
+
+	/** Desired conditions that must be satisfied by a generated plan. */
+	TSet<FKMGoapCondition> DesiredEffects;
+};
+
+/**
+ * Immutable value snapshot consumed by async GOAP search workers.
+ *
+ * The snapshot is created on the game thread and then treated as read-only by worker
+ * threads. It contains no UObject pointers.
+ */
+struct FKMGoapPlanningSnapshot
+{
+	/** Initial simulated facts/beliefs captured from the agent. */
 	FKMGoapSimState InitialState;
 
-	/**
-	 * Weak reference to the agent requesting the plan.
-	 *
-	 * This may be used by planning algorithms to evaluate goal priority or
-	 * access agent-specific context without owning the component.
-	 */
-	TWeakObjectPtr<class UKMGoapAgentComponent> Agent;
+	/** Available actions copied into thread-safe value form. */
+	TArray<FKMGoapActionSnapshot> Actions;
 
-	/**
-	 * Collection of actions available to the planner for the current request.
-	 *
-	 * The actions are expected to already be filtered to those usable by the
-	 * requesting agent before planning begins.
-	 */
-	TArray<TObjectPtr<class UKMGoapAgentAction>> Actions;
+	/** Candidate goals copied into thread-safe value form. */
+	TArray<FKMGoapGoalSnapshot> Goals;
+
+	/** Search limit copied from the active planner configuration. */
+	int32 MaxExpandedNodes = 5000;
+
+	/** Maximum allowed action depth for a generated plan. */
+	int32 MaxDepth = 64;
+
+	/** Worker-side time budget in milliseconds. */
+	float TimeBudgetMs = 2.0f;
+};
+
+/**
+ * Thread-safe result produced by async GOAP planning.
+ *
+ * Runtime pointer reconstruction is done later on the game thread by using the
+ * stored goal/action indices.
+ */
+struct FKMGoapPlanningSnapshotResult
+{
+	/** True when a valid plan was found. */
+	bool bSuccess = false;
+	
+	/** Reason the search failed when bSuccess is false. */
+	EKMGoapPlanningFailureReason FailureReason = EKMGoapPlanningFailureReason::None;
+
+	/** Index of the selected runtime goal in the request's goal pointer table. */
+	int32 RuntimeGoalIndex = INDEX_NONE;
+
+	/** Ordered runtime action indices selected by the search. */
+	TArray<int32> RuntimeActionIndices;
+
+	/** Total calculated cost of the selected plan. */
+	float TotalCost = 0.f;
 };

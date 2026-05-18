@@ -3,17 +3,21 @@
 
 #include "CoreMinimal.h"
 #include "Subsystems/GameInstanceSubsystem.h"
+#include "Subsystem/Data/KMGoapPlanningRequest.h"
+#include "Subsystem/Data/KMGoapPlanningTypes.h"
 #include "KMGoapPlannerSubsystem.generated.h"
 
+class UKMGoapAgentComponent;
+class UKMGoapAgentGoal;
+class UKMGoapAgentAction;
 class UKMGoapPlannerConfig;
-class UKMGoapPlanSearchBase;
 
 /**
- * Game-instance subsystem that owns the runtime GOAP planner search algorithm.
+ * Game-instance subsystem that owns asynchronous GOAP planning requests.
  *
- * The subsystem loads the project planner configuration, creates the configured
- * search algorithm object, and exposes it to GOAP agents that need to compute
- * action plans.
+ * The subsystem loads planner limits from project settings, snapshots UObject-facing
+ * agent data on the game thread, runs value-only search work on UE worker threads,
+ * and dispatches completion callbacks back on the game thread.
  */
 UCLASS(Category="KMGoap")
 class KMGOAP_API UKMGoapPlannerSubsystem : public UGameInstanceSubsystem
@@ -24,8 +28,7 @@ public:
 	/**
 	 * Initializes the planner subsystem for the owning game instance.
 	 *
-	 * Loads the planner configuration from project settings and creates the
-	 * configured search algorithm instance.
+	 * Loads planner configuration from project settings.
 	 *
 	 * @param Collection Subsystem dependency collection provided by Unreal Engine.
 	 */
@@ -34,30 +37,32 @@ public:
 	/**
 	 * Deinitializes the planner subsystem.
 	 *
-	 * Releases references to the created search algorithm and loaded planner
-	 * configuration before allowing the base subsystem to shut down.
+	 * Cancels pending request bookkeeping and releases loaded configuration references.
 	 */
 	virtual void Deinitialize() override;
 
 	/**
-	 * Returns the currently configured GOAP plan-search algorithm instance.
+	 * Queues an asynchronous GOAP planning request.
 	 *
-	 * @return Runtime search algorithm object, or nullptr if configuration loading
-	 * failed or no algorithm class was configured.
+	 * Request data is snapshotted on the game thread, searched on a worker thread,
+	 * and completed back on the game thread through the supplied callbacks.
+	 *
+	 * @param Request UObject-facing request data and callbacks.
+	 * @return Handle that can be stored by the caller for tracking or cancellation.
 	 */
-	UFUNCTION(BlueprintCallable, BlueprintPure, Category="KMGoap|Planner")
-	UKMGoapPlanSearchBase* GetSearchAlgorithm() { return SearchAlgorithm; }
+	FKMGoapPlanningRequestHandle RequestPlanAsync(FKMGoapPlanningRequest&& Request);
+
+	/**
+	 * Cancels a pending async planning request.
+	 *
+	 * Cancellation prevents callbacks from firing. Already-running worker work may
+	 * still finish, but its result will be ignored on the game thread.
+	 *
+	 * @param Handle Request handle returned by RequestPlanAsync.
+	 */
+	void CancelPlanRequest(const FKMGoapPlanningRequestHandle& Handle);
 
 private:
-	/**
-	 * Runtime instance of the configured GOAP search algorithm.
-	 *
-	 * This object is created from the planner configuration during subsystem
-	 * initialization and reused by agents when requesting plans.
-	 */
-	UPROPERTY(Transient)
-	TObjectPtr<UKMGoapPlanSearchBase> SearchAlgorithm = nullptr;
-
 	/**
 	 * Planner configuration asset loaded from KMGoap project settings.
 	 *
@@ -68,10 +73,86 @@ private:
 	TObjectPtr<UKMGoapPlannerConfig> LoadedConfig = nullptr;
 
 	/**
-	 * Creates and configures the runtime search algorithm from project settings.
+	 * Runtime data retained while an async planning request is pending.
 	 *
-	 * Loads the configured planner asset, validates the selected algorithm class,
-	 * instantiates the algorithm, and copies runtime planning limits onto it.
+	 * UObject references are weak so pending planner work does not keep gameplay
+	 * objects alive past their intended lifetime.
 	 */
-	void CreateAlgorithmFromConfig();
+	struct FPendingPlanRequest
+	{
+		TWeakObjectPtr<UKMGoapAgentComponent> Agent;
+		TArray<TWeakObjectPtr<UKMGoapAgentGoal>> RuntimeGoals;
+		TArray<TWeakObjectPtr<UKMGoapAgentAction>> RuntimeActions;
+		FKMGoapOnPlanAcquired OnPlanAcquired;
+		FKMGoapOnPlanFailed OnPlanFailed;
+	};
+
+	/** Pending async planning requests indexed by handle id. */
+	TMap<FGuid, FPendingPlanRequest> PendingRequests;
+
+	/**
+	 * Value-only planning work waiting for an async execution slot.
+	 *
+	 * These entries contain no UObject pointers and are safe to move into worker tasks.
+	 */
+	struct FQueuedPlanWork
+	{
+		FKMGoapPlanningRequestHandle Handle;
+		FKMGoapPlanningSnapshot Snapshot;
+	};
+
+	/** Planning snapshots waiting for a worker slot. */
+	TArray<FQueuedPlanWork> QueuedPlanWork;
+
+	/** Number of GOAP search tasks currently running on worker threads. */
+	int32 ActiveAsyncPlanCount = 0;
+
+	/** Maximum number of GOAP searches allowed to run concurrently. */
+	int32 MaxConcurrentAsyncPlans = 2;
+
+	/** Maximum number of queued planning requests. A value of 0 means unbounded. */
+	int32 MaxQueuedAsyncPlans = 0;
+
+	/**
+	 * Attempts to dispatch queued planning work while async worker slots are available.
+	 *
+	 * This method must be called on the game thread.
+	 */
+	void TryDispatchQueuedPlanWork();
+
+	/**
+	 * Dispatches one immutable planning snapshot to the worker thread pool.
+	 *
+	 * @param Work Queued work item to execute.
+	 */
+	void DispatchPlanWork(FQueuedPlanWork&& Work);
+	
+	/**
+	 * Loads planner configuration from project settings.
+	 */
+	void LoadPlannerConfig();
+
+	/**
+	 * Applies configured search limits to a planning snapshot.
+	 *
+	 * @param OutSnapshot Snapshot that receives async planner limits.
+	 */
+	void ApplyPlanningLimits(FKMGoapPlanningSnapshot& OutSnapshot) const;
+
+	/**
+	 * Builds a thread-safe snapshot from a game-thread planning request.
+	 *
+	 * This is the only step that may read UObject planner data for async planning.
+	 */
+	bool BuildPlanningSnapshot(
+		const FKMGoapPlanningRequest& Request,
+		FKMGoapPlanningSnapshot& OutSnapshot,
+		FPendingPlanRequest& OutPendingRequest) const;
+
+	/**
+	 * Completes an async planning request on the game thread.
+	 */
+	void CompletePlanRequest(
+		FKMGoapPlanningRequestHandle Handle,
+		FKMGoapPlanningSnapshotResult Result);
 };
