@@ -29,8 +29,6 @@ void UKMGoapDefaultStateMachine::Tick_Implementation(float DeltaTime)
 {
 	if (!CurrentAction)
 	{
-		UE_LOG(LogGoapDefaultStateMachine, Log, TEXT("No Action, Calculating a new Plan"));
-
 		// Planning is requested only when execution needs a new action. Async requests
 		// are issued once and completed through planner callbacks, so the game thread
 		// never blocks while the search runs.
@@ -38,6 +36,7 @@ void UKMGoapDefaultStateMachine::Tick_Implementation(float DeltaTime)
 		{
 			if (!bIsWaitingForPlan)
 			{
+				UE_LOG(LogGoapDefaultStateMachine, Log, TEXT("No Plan, Calculating a new one"));
 				CalculatePlan();
 			}
 
@@ -304,6 +303,7 @@ void UKMGoapDefaultStateMachine::UpdateExecutionState()
 {
 	if (!CurrentPlan.IsValid())
 	{
+		UE_LOG(LogGoapDefaultStateMachine, Log, TEXT("Attempt to update execution state with invalid plan"));
 		return;
 	}
 
@@ -313,4 +313,5 @@ void UKMGoapDefaultStateMachine::UpdateExecutionState()
 	// the remaining actions stay queued in CurrentPlan.
 	CurrentAction = CurrentPlan.Actions[0];
 	CurrentPlan.Actions.RemoveAt(0);
+	UE_LOG(LogGoapDefaultStateMachine, Log, TEXT("Execution State Updated. Next Action: %s"), *CurrentAction->GetName());
 }

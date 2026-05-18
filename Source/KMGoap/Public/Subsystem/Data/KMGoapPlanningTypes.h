@@ -71,6 +71,33 @@ struct FKMGoapSimState
 };
 
 /**
+ * Describes why a planning snapshot search failed.
+ *
+ * This is intentionally value-only so it can be written by worker-thread planner code
+ * and inspected later on the game thread.
+ */
+enum class EKMGoapPlanningFailureReason : uint8
+{
+	/** No failure occurred. */
+	None,
+
+	/** The snapshot did not contain enough goals or actions to search. */
+	InvalidSnapshot,
+
+	/** The search exhausted available paths without satisfying a goal. */
+	NoPlanFound,
+
+	/** The search stopped because Operation budget was reached. */
+	BudgetExceeded,
+	
+	/** The search failed because the selected solution produced no executable actions. */
+	EmptySolution,
+	
+	/** The search failed because the selected goal was already satisfied. */
+	GoalSatisfied
+};
+
+/**
  * Thread-safe value snapshot of an action used by asynchronous planning.
  *
  * This struct intentionally stores only plain data copied on the game thread.
@@ -147,6 +174,9 @@ struct FKMGoapPlanningSnapshotResult
 {
 	/** True when a valid plan was found. */
 	bool bSuccess = false;
+	
+	/** Reason the search failed when bSuccess is false. */
+	EKMGoapPlanningFailureReason FailureReason = EKMGoapPlanningFailureReason::None;
 
 	/** Index of the selected runtime goal in the request's goal pointer table. */
 	int32 RuntimeGoalIndex = INDEX_NONE;

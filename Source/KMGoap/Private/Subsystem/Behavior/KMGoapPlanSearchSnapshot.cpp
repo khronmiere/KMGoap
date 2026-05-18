@@ -46,16 +46,20 @@ bool FKMGoapPlanSearchSnapshot::SolveGoal(
 	const FKMGoapGoalSnapshot& Goal,
 	FKMGoapPlanningSnapshotResult& OutResult)
 {
+	if (Snapshot.Actions.IsEmpty() || Snapshot.Goals.IsEmpty())
+	{
+		OutResult.FailureReason = EKMGoapPlanningFailureReason::InvalidSnapshot;
+		return false;
+	}
+	
 	OutResult = FKMGoapPlanningSnapshotResult{};
 
 	if (Goal.RuntimeGoalIndex == INDEX_NONE || SatisfiesAll(Snapshot.InitialState, Goal.DesiredEffects))
 	{
+		OutResult.FailureReason = EKMGoapPlanningFailureReason::GoalSatisfied;
 		return false;
 	}
-
-	const double StartSeconds = FPlatformTime::Seconds();
-	int32 ExpandedNodes = 0;
-
+	
 	struct FNode
 	{
 		float Cost = 0.f;
@@ -104,15 +108,23 @@ bool FKMGoapPlanSearchSnapshot::SolveGoal(
 	Root.StateHash = HashState(Root.State);
 	Root.Depth = 0;
 
-	BestCostByState.Add(Root.StateHash, 0.f);
+	BestCostByState.Add(Root.StateHash, Root.Cost);
 	PushNode(MoveTemp(Root));
 
+	const double StartSeconds = FPlatformTime::Seconds();
 	int32 SolutionIndex = INDEX_NONE;
-
+	int32 ExpandedNodes = 0;
+	
 	while (Open.Num() > 0)
 	{
 		if (IsBudgetExceeded(StartSeconds, ExpandedNodes, Snapshot))
 		{
+			if (SolutionIndex == INDEX_NONE)
+			{
+				OutResult.FailureReason = EKMGoapPlanningFailureReason::BudgetExceeded;
+				return false;
+			}
+			
 			break;
 		}
 
@@ -124,7 +136,7 @@ bool FKMGoapPlanSearchSnapshot::SolveGoal(
 			continue;
 		}
 
-		FNode& Current = Nodes[Item.NodeIndex];
+		const FNode& Current = Nodes[Item.NodeIndex];
 
 		if (const float* Best = BestCostByState.Find(Current.StateHash))
 		{
@@ -164,15 +176,15 @@ bool FKMGoapPlanSearchSnapshot::SolveGoal(
 
 			const float NextCost = Current.Cost + Action.Cost;
 			const uint32 NextHash = HashState(NextState);
-
+			
 			if (const float* Existing = BestCostByState.Find(NextHash))
 			{
-				if (NextCost >= *Existing - KINDA_SMALL_NUMBER)
+				if (NextCost >= *Existing)
 				{
 					continue;
 				}
 			}
-
+			
 			BestCostByState.Add(NextHash, NextCost);
 
 			FNode Next;
@@ -189,6 +201,7 @@ bool FKMGoapPlanSearchSnapshot::SolveGoal(
 
 	if (SolutionIndex == INDEX_NONE)
 	{
+		OutResult.FailureReason = EKMGoapPlanningFailureReason::NoPlanFound;
 		return false;
 	}
 
@@ -211,6 +224,7 @@ bool FKMGoapPlanSearchSnapshot::SolveGoal(
 
 	if (ReverseActionIndices.IsEmpty())
 	{
+		OutResult.FailureReason = EKMGoapPlanningFailureReason::EmptySolution;
 		return false;
 	}
 
@@ -232,11 +246,7 @@ bool FKMGoapPlanSearchSnapshot::SatisfiesAll(const FKMGoapSimState& State, const
 		}
 
 		bool Value = false;
-		if (!State.TryGet(Condition.Tag, Value))
-		{
-			return false;
-		}
-
+		State.TryGet(Condition.Tag, Value);
 		if (Value != Condition.bValue)
 		{
 			return false;
@@ -261,15 +271,23 @@ uint32 FKMGoapPlanSearchSnapshot::HashState(const FKMGoapSimState& State)
 		return A.ToString() < B.ToString();
 	});
 
-	uint32 Hash = 0;
+	uint32 Hash = GetTypeHash(State.Values.Num());
+
 	for (const FGameplayTag& Key : Keys)
 	{
-		const bool* Value = State.Values.Find(Key);
-		Hash = HashCombineFast(Hash, GetTypeHash(Key));
-		Hash = HashCombineFast(Hash, GetTypeHash(Value ? *Value : false));
+		const bool bValue = State.Values.FindRef(Key);
+
+		const uint32 KeyHash = GetTypeHash(Key);
+
+		// Use distinct constants so true/false always affect the hash differently.
+		const uint32 ValueHash = bValue
+			? 0x9E3779B9u
+			: 0x85EBCA6Bu;
+
+		const uint32 PairHash = HashCombineFast(KeyHash, ValueHash);
+		Hash = HashCombineFast(Hash, PairHash);
 	}
 
-	Hash = HashCombineFast(Hash, GetTypeHash(State.Values.Num()));
 	return Hash;
 }
 
